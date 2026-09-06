@@ -1,0 +1,27 @@
+{
+  "name": "linkiac-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@12.3.4",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:web": "turbo run dev --filter=@linkiac/web",
+    "dev:mobile": "pnpm --filter @linkiac/mobile start",
+    "dev:mobile:tunnel": "pnpm --filter @linkiac/mobile start --tunnel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rimraf node_modules"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "turbo": "^2.4.4",
+    "typescript": "^5.8.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@turbo/windows-64"
+    ]
+  }
+}
