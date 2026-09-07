@@ -88,7 +88,7 @@ export default function HomePage() {
             <h3 className="font-semibold text-zinc-100 text-base">Private Recommendations</h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
               Accepted friends send links to your dedicated Suggestions Inbox. Accept links into your own library
-              without modifying your friend's collection.
+              without modifying your friend&apos;s collection.
             </p>
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-zinc-900 py-6 px-6 text-center text-xs text-zinc-600">
-        Linkiac v1.0 • Engineered with Next.js, PostgreSQL via Supabase, and Expo/Capacitor Cross-Platform Shells.
+        Linkiac v1.0 • Engineered with Next.js, PostgreSQL via Supabase, and Expo React Native.
       </footer>
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import {
   Profile,
   Category,
@@ -48,9 +49,15 @@ interface AppContextType {
   suggestions: SendRecipient[];
   domainStats: DomainStat[];
   isLoaded: boolean;
+  signOut: () => Promise<void>;
   addLink: (input: AddLinkInput) => Promise<Link>;
   updateLink: (id: string, updates: Partial<Link>) => Promise<void>;
   deleteLink: (id: string) => Promise<void>;
+  addCategory: (name: string) => Promise<Category>;
+  deleteCategory: (id: string) => Promise<void>;
+  addFolder: (name: string, category_id?: string | null, parent_folder_id?: string | null) => Promise<Folder>;
+  deleteFolder: (id: string) => Promise<void>;
+  updateProfile: (updates: { username?: string; display_name?: string; avatar_url?: string | null }) => Promise<void>;
   acceptSuggestion: (suggestionId: string, options?: { category_id?: string | null; folder_id?: string | null }) => Promise<Link | null>;
   rejectSuggestion: (suggestionId: string) => Promise<void>;
   acceptFriendRequest: (friendshipId: string) => Promise<void>;
@@ -77,6 +84,7 @@ export function isValidUUID(str: string): boolean {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<Profile>(defaultCurrentUser);
   const [links, setLinks] = useState<Link[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -109,18 +117,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Sign out handler (scoped locally to preserve sessions on other devices)
+  const signOut = useCallback(async () => {
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (err) {
+      console.warn('Mobile signOut notice:', err);
+    } finally {
+      try {
+        await AsyncStorage.removeItem(STORAGE_KEY);
+      } catch {}
+      setLinks([]);
+      setCategories([]);
+      setFolders([]);
+      setFriends([]);
+      setSuggestions([]);
+      router.replace('/login');
+    }
+  }, [router]);
+
   // Synchronize all domain entities from Supabase
   const syncAllFromSupabase = useCallback(async () => {
     try {
       // Check auth session
       const { data: sessionData } = await supabase.auth.getSession();
       const authUser = sessionData?.session?.user;
-      if (authUser && isValidUUID(authUser.id)) {
+      if (!authUser || !isValidUUID(authUser.id)) {
+        return;
+      }
+
+      // Fetch active profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (profile) {
+        setCurrentUser(profile);
+      } else {
         setCurrentUser(prev => ({
           ...prev,
           id: authUser.id,
           username: authUser.user_metadata?.username || prev.username,
-          display_name: authUser.user_metadata?.display_name || prev.display_name,
+          display_name: authUser.user_metadata?.full_name || authUser.user_metadata?.display_name || prev.display_name,
         }));
       }
 
@@ -151,7 +191,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (linksRes.status === 'fulfilled' && !linksRes.value.error && Array.isArray(linksRes.value.data)) {
         updatedLinks = linksRes.value.data.map((l: any) => ({
           id: l.id,
-          user_id: l.user_id || defaultCurrentUser.id,
+          user_id: l.user_id || authUser.id,
           url: l.url,
           title: l.title || null,
           comment: l.comment || null,
@@ -184,7 +224,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (suggestionsRes.status === 'fulfilled' && !suggestionsRes.value.error && Array.isArray(suggestionsRes.value.data)) {
-        updatedSuggestions = suggestionsRes.value.data;
+        const rawSuggestions: any[] = suggestionsRes.value.data;
+
+        // Check if any suggestions lack the joined send record
+        const missingSendIds = rawSuggestions.filter(s => !s.send && s.send_id).map(s => s.send_id);
+        const sendMap = new Map<string, any>();
+        if (missingSendIds.length > 0) {
+          const { data: fetchedSends } = await supabase.from('sends').select('*').in('id', missingSendIds);
+          (fetchedSends || []).forEach(snd => sendMap.set(snd.id, snd));
+        }
+
+        // Check if any send record lacks sender profile
+        const senderIds = new Set<string>();
+        rawSuggestions.forEach(s => {
+          const snd = s.send || sendMap.get(s.send_id);
+          if (snd && snd.sender_id && (!snd.sender || !snd.sender.username)) {
+            senderIds.add(snd.sender_id);
+          }
+        });
+
+        const profileMap = new Map<string, any>();
+        if (senderIds.size > 0) {
+          const { data: profiles } = await supabase.from('profiles').select('*').in('id', Array.from(senderIds));
+          (profiles || []).forEach(p => profileMap.set(p.id, p));
+        }
+
+        updatedSuggestions = rawSuggestions.map(s => {
+          const snd = s.send || sendMap.get(s.send_id);
+          if (!snd) return s;
+          const sender = snd.sender && snd.sender.username ? snd.sender : profileMap.get(snd.sender_id);
+          return {
+            ...s,
+            send: {
+              ...snd,
+              sender: sender || snd.sender || null,
+            },
+          };
+        });
+
         setSuggestions(updatedSuggestions);
       }
 
@@ -220,21 +297,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     init();
 
+    // Supabase Auth state change listener
+    const {
+      data: { subscription: authListener },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        syncAllFromSupabase();
+      } else if (event === 'SIGNED_OUT') {
+        setLinks([]);
+        setCategories([]);
+        setFolders([]);
+        setFriends([]);
+        setSuggestions([]);
+      }
+    });
+
     // Auto-poll Supabase every 4 seconds so updates from Web appear on Mobile automatically
     const pollInterval = setInterval(() => {
       syncAllFromSupabase();
     }, 4000);
 
     // Sync when app comes to foreground
-    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+    const appStateSub = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         syncAllFromSupabase();
       }
     });
 
     return () => {
+      authListener.unsubscribe();
       clearInterval(pollInterval);
-      subscription.remove();
+      appStateSub.remove();
     };
   }, [syncAllFromSupabase]);
 
@@ -367,6 +460,177 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     syncAllFromSupabase();
   }, [categories, folders, friends, suggestions, persistState, syncAllFromSupabase]);
+
+  const addCategory = useCallback(async (name: string): Promise<Category> => {
+    const catId = generateUUID();
+    const newCategory: Category = {
+      id: catId,
+      user_id: currentUser.id,
+      name: name.trim(),
+      created_at: new Date().toISOString(),
+    };
+
+    setCategories(prev => {
+      const updated = [...prev, newCategory];
+      persistState(links, updated, folders, friends, suggestions);
+      return updated;
+    });
+
+    try {
+      await supabase.from('categories').insert({
+        id: catId,
+        user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
+        name: name.trim(),
+      });
+    } catch (e) {
+      console.warn('Supabase addCategory notice:', e);
+    }
+
+    syncAllFromSupabase();
+    return newCategory;
+  }, [currentUser.id, links, folders, friends, suggestions, persistState, syncAllFromSupabase]);
+
+  const deleteCategory = useCallback(async (id: string): Promise<void> => {
+    setCategories(prev => {
+      const updatedCats = prev.filter(c => c.id !== id);
+      setFolders(fPrev => fPrev.map(f => (f.category_id === id ? { ...f, category_id: null } : f)));
+      setLinks(lPrev => lPrev.map(l => (l.category_id === id ? { ...l, category_id: null } : l)));
+      persistState(links, updatedCats, folders, friends, suggestions);
+      return updatedCats;
+    });
+
+    if (isValidUUID(id)) {
+      try {
+        await supabase.from('links').update({ category_id: null }).eq('category_id', id);
+        await supabase.from('folders').update({ category_id: null }).eq('category_id', id);
+        await supabase.from('categories').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Supabase deleteCategory notice:', e);
+      }
+    }
+
+    syncAllFromSupabase();
+  }, [links, folders, friends, suggestions, persistState, syncAllFromSupabase]);
+
+  const addFolder = useCallback(async (
+    name: string,
+    category_id?: string | null,
+    parent_folder_id?: string | null
+  ): Promise<Folder> => {
+    let resolvedCategoryId = category_id || null;
+    if (parent_folder_id) {
+      const parent = folders.find(f => f.id === parent_folder_id);
+      if (parent) resolvedCategoryId = parent.category_id;
+    }
+
+    const folderId = generateUUID();
+    const newFolder: Folder = {
+      id: folderId,
+      user_id: currentUser.id,
+      category_id: resolvedCategoryId,
+      parent_folder_id: parent_folder_id || null,
+      name: name.trim(),
+      created_at: new Date().toISOString(),
+    };
+
+    setFolders(prev => {
+      const updated = [...prev, newFolder];
+      persistState(links, categories, updated, friends, suggestions);
+      return updated;
+    });
+
+    try {
+      await supabase.from('folders').insert({
+        id: folderId,
+        user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
+        category_id: resolvedCategoryId && isValidUUID(resolvedCategoryId) ? resolvedCategoryId : null,
+        parent_folder_id: parent_folder_id && isValidUUID(parent_folder_id) ? parent_folder_id : null,
+        name: name.trim(),
+      });
+    } catch (e) {
+      console.warn('Supabase addFolder notice:', e);
+    }
+
+    syncAllFromSupabase();
+    return newFolder;
+  }, [currentUser.id, links, categories, folders, friends, suggestions, persistState, syncAllFromSupabase]);
+
+  const deleteFolder = useCallback(async (id: string): Promise<void> => {
+    const getDescendantIds = (folderId: string): string[] => {
+      const children = folders.filter(f => f.parent_folder_id === folderId);
+      return [folderId, ...children.flatMap(c => getDescendantIds(c.id))];
+    };
+
+    const idsToDelete = new Set(getDescendantIds(id));
+    setFolders(prev => {
+      const updated = prev.filter(f => !idsToDelete.has(f.id));
+      setLinks(lPrev => lPrev.map(l => (l.folder_id && idsToDelete.has(l.folder_id) ? { ...l, folder_id: null } : l)));
+      persistState(links, categories, updated, friends, suggestions);
+      return updated;
+    });
+
+    try {
+      for (const fId of Array.from(idsToDelete)) {
+        if (isValidUUID(fId)) {
+          await supabase.from('links').update({ folder_id: null }).eq('folder_id', fId);
+          await supabase.from('folders').delete().eq('id', fId);
+        }
+      }
+    } catch (e) {
+      console.warn('Supabase deleteFolder notice:', e);
+    }
+
+    syncAllFromSupabase();
+  }, [folders, links, categories, friends, suggestions, persistState, syncAllFromSupabase]);
+
+  const updateProfile = useCallback(async (updates: {
+    username?: string;
+    display_name?: string;
+    avatar_url?: string | null;
+  }): Promise<void> => {
+    if (!isValidUUID(currentUser.id)) return;
+
+    const payload: any = {};
+    if (updates.username) payload.username = updates.username.toLowerCase().trim();
+    if (updates.display_name !== undefined) payload.display_name = updates.display_name.trim();
+    if (updates.avatar_url !== undefined) payload.avatar_url = updates.avatar_url;
+
+    // Check username uniqueness if changing
+    if (payload.username && payload.username !== currentUser.username) {
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', payload.username)
+        .neq('id', currentUser.id)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error(`Username @${payload.username} is already taken.`);
+      }
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(payload)
+      .eq('id', currentUser.id);
+
+    if (error) throw error;
+
+    await supabase.auth.updateUser({
+      data: {
+        ...(payload.username ? { username: payload.username } : {}),
+        ...(payload.display_name ? { full_name: payload.display_name } : {}),
+        ...(payload.avatar_url !== undefined ? { avatar_url: payload.avatar_url } : {}),
+      },
+    });
+
+    setCurrentUser(prev => ({
+      ...prev,
+      ...payload,
+    }));
+
+    await syncAllFromSupabase();
+  }, [currentUser.id, currentUser.username, syncAllFromSupabase]);
 
   const acceptSuggestion = useCallback(async (
     suggestionId: string,
@@ -538,9 +802,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       suggestions,
       domainStats,
       isLoaded,
+      signOut,
       addLink,
       updateLink,
       deleteLink,
+      addCategory,
+      deleteCategory,
+      addFolder,
+      deleteFolder,
+      updateProfile,
       acceptSuggestion,
       rejectSuggestion,
       acceptFriendRequest,
@@ -557,9 +827,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       suggestions,
       domainStats,
       isLoaded,
+      signOut,
       addLink,
       updateLink,
       deleteLink,
+      addCategory,
+      deleteCategory,
+      addFolder,
+      deleteFolder,
+      updateProfile,
       acceptSuggestion,
       rejectSuggestion,
       acceptFriendRequest,

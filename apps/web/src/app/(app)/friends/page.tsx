@@ -1,29 +1,80 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Friendship } from '@linkiac/shared';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Friendship, Profile } from '@linkiac/shared';
 import { Navbar } from '@/components/Navbar';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { SendLinkModal } from '@/components/SendLinkModal';
 import { useApp } from '@/lib/app-context';
-import { Users, UserPlus, UserCheck, Search, Send, UserX, Check, X, Shield } from 'lucide-react';
+import { getSupabase } from '@/lib/supabase/client';
+import { Users, UserPlus, UserCheck, Search, Send, UserX, Check, X, Shield, Loader2 } from 'lucide-react';
 
 export default function FriendsPage() {
-  const { friends, acceptFriendRequest, removeFriend } = useApp();
+  const { currentUser, friends, acceptFriendRequest, removeFriend, syncAllFromSupabase } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Profile[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [sendingModalOpen, setSendingModalOpen] = useState(false);
   const [requestSentUsernames, setRequestSentUsernames] = useState<Set<string>>(new Set());
 
-  // Demo discoverable public users
-  const discoverableUsers = [
-    { id: 'u-1', username: 'elena_designer', display_name: 'Elena Rostova', bio: 'Product Designer & Design Systems' },
-    { id: 'u-2', username: 'marcus_ai', display_name: 'Marcus Vance', bio: 'ML Engineer & Distributed Systems' },
-    { id: 'u-3', username: 'chloe_dev', display_name: 'Chloe Zhang', bio: 'Frontend Specialist' },
-  ];
+  // Connection map: otherUserId -> { status, isIncoming, friendshipId }
+  const connectionMap = useMemo(() => {
+    const map = new Map<string, { status: string; isIncoming: boolean; friendshipId: string }>();
+    friends.forEach(f => {
+      const isRequester = f.requester_id === currentUser.id;
+      const otherId = isRequester ? f.recipient_id : f.requester_id;
+      map.set(otherId, {
+        status: f.status,
+        isIncoming: !isRequester,
+        friendshipId: f.id,
+      });
+    });
+    return map;
+  }, [friends, currentUser.id]);
 
-  const acceptedFriends = friends.filter(f => f.status === 'accepted');
-  const pendingRequests = friends.filter(f => f.status === 'pending');
+  // Query Supabase public.profiles live on search query
+  useEffect(() => {
+    const query = searchQuery.trim().toLowerCase().replace(/^@/, '');
+    if (!query) {
+      setSearchResults([]);
+      setIsSearching(false);
+      setSearchError(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      setSearchError(null);
+      try {
+        const supabase = getSupabase();
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+          .neq('id', currentUser.id)
+          .limit(10);
+
+        if (error) {
+          console.warn('Friend search error:', error);
+          setSearchError('Search failed: ' + error.message);
+        } else {
+          setSearchResults(data || []);
+        }
+      } catch (err: any) {
+        setSearchError(err.message || 'Error querying profiles');
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, currentUser.id]);
+
+  const acceptedFriends = useMemo(() => friends.filter(f => f.status === 'accepted'), [friends]);
+  const incomingRequests = useMemo(() => friends.filter(f => f.status === 'pending' && f.recipient_id === currentUser.id), [friends, currentUser.id]);
+  const outgoingRequests = useMemo(() => friends.filter(f => f.status === 'pending' && f.requester_id === currentUser.id), [friends, currentUser.id]);
 
   const handleAccept = async (friendshipId: string) => {
     await acceptFriendRequest(friendshipId);
@@ -33,18 +84,48 @@ export default function FriendsPage() {
     await removeFriend(friendshipId);
   };
 
+  const handleCancelRequest = async (friendshipId: string) => {
+    await removeFriend(friendshipId);
+  };
+
   const handleRemoveFriend = async (friendshipId: string, name: string) => {
     if (confirm(`Remove @${name} from your friends? You will no longer be able to send links directly.`)) {
       await removeFriend(friendshipId);
     }
   };
 
-  const handleSendRequest = (username: string) => {
-    setRequestSentUsernames(prev => {
-      const next = new Set(prev);
-      next.add(username);
-      return next;
-    });
+  const handleSendRequest = async (targetUser: Profile) => {
+    try {
+      const supabase = getSupabase();
+
+      // Ensure no duplicate request
+      const { data: existing } = await supabase
+        .from('friendships')
+        .select('id, status')
+        .or(`and(requester_id.eq.${currentUser.id},recipient_id.eq.${targetUser.id}),and(requester_id.eq.${targetUser.id},recipient_id.eq.${currentUser.id})`)
+        .maybeSingle();
+
+      if (existing) {
+        alert(`A connection or request with @${targetUser.username} already exists (${existing.status}).`);
+        return;
+      }
+
+      const { error } = await supabase.from('friendships').insert({
+        requester_id: currentUser.id,
+        recipient_id: targetUser.id,
+        status: 'pending',
+      });
+
+      if (error) {
+        alert('Could not send friend request: ' + error.message);
+        return;
+      }
+
+      setRequestSentUsernames(prev => new Set(prev).add(targetUser.username));
+      await syncAllFromSupabase();
+    } catch (err: any) {
+      alert(err.message || 'Failed to send friend request');
+    }
   };
 
   return (
@@ -96,34 +177,79 @@ export default function FriendsPage() {
 
             {searchQuery.trim() && (
               <div className="space-y-2 pt-2 border-t border-zinc-800/60">
-                {discoverableUsers
-                  .filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()))
-                  .map(user => {
-                    const hasRequested = requestSentUsernames.has(user.username);
+                {isSearching && (
+                  <div className="flex items-center gap-2 py-3 text-xs text-zinc-400 justify-center">
+                    <Loader2 size={14} className="animate-spin text-indigo-400" />
+                    <span>Searching for Linkiac users...</span>
+                  </div>
+                )}
+
+                {searchError && (
+                  <p className="text-xs text-red-400 py-1">{searchError}</p>
+                )}
+
+                {!isSearching && searchResults.length === 0 && (
+                  <p className="text-xs text-zinc-500 py-2 text-center">
+                    No users found matching &ldquo;@{searchQuery.trim()}&rdquo;.
+                  </p>
+                )}
+
+                {!isSearching &&
+                  searchResults.map(user => {
+                    const conn = connectionMap.get(user.id);
+                    const isConnected = conn?.status === 'accepted';
+                    const isPendingIncoming = conn?.status === 'pending' && conn.isIncoming;
+                    const isPendingOutgoing = (conn?.status === 'pending' && !conn.isIncoming) || requestSentUsernames.has(user.username);
+
                     return (
                       <div
                         key={user.id}
                         className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs"
                       >
-                        <div>
-                          <p className="font-semibold text-zinc-200">
-                            {user.display_name}{' '}
-                            <span className="text-zinc-500 font-mono text-[11px]">@{user.username}</span>
-                          </p>
-                          <p className="text-zinc-400 text-[11px]">{user.bio}</p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-indigo-900/40 border border-zinc-700 flex items-center justify-center shrink-0">
+                            {user.avatar_url ? (
+                              <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
+                            ) : (
+                              <Users size={14} className="text-indigo-300" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-zinc-200">
+                              {user.display_name || `@${user.username}`}{' '}
+                              <span className="text-zinc-500 font-mono text-[11px]">@{user.username}</span>
+                            </p>
+                            <p className="text-zinc-500 text-[10px]">
+                              Member since {new Date(user.created_at || Date.now()).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          disabled={hasRequested}
-                          onClick={() => handleSendRequest(user.username)}
-                          className={`px-3 py-1.5 rounded-xl font-medium transition-all ${
-                            hasRequested
-                              ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                              : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20'
-                          }`}
-                        >
-                          {hasRequested ? 'Request Sent' : 'Add Friend'}
-                        </button>
+
+                        {isConnected ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                            <Check size={12} /> Friends
+                          </span>
+                        ) : isPendingIncoming ? (
+                          <button
+                            type="button"
+                            onClick={() => handleAccept(conn!.friendshipId)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl font-medium transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 active:scale-95"
+                          >
+                            <Check size={12} /> Accept Request
+                          </button>
+                        ) : isPendingOutgoing ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                            Request Pending
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSendRequest(user)}
+                            className="px-3 py-1.5 rounded-xl font-medium transition-all bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 active:scale-95"
+                          >
+                            Add Friend
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -131,18 +257,18 @@ export default function FriendsPage() {
             )}
           </div>
 
-          {/* Pending Friend Requests */}
-          {pendingRequests.length > 0 && (
+          {/* Incoming / Pending Friend Requests */}
+          {incomingRequests.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-sm font-semibold text-amber-400 flex items-center gap-2">
                 <span>Pending Requests</span>
                 <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono px-2 py-0.5 rounded-full">
-                  {pendingRequests.length}
+                  {incomingRequests.length}
                 </span>
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {pendingRequests.map(req => {
+                {incomingRequests.map((req: Friendship) => {
                   const profile = req.requester;
                   if (!profile) return null;
                   return (
@@ -189,6 +315,55 @@ export default function FriendsPage() {
             </div>
           )}
 
+          {/* Outgoing Friend Requests Sent */}
+          {outgoingRequests.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-zinc-400 flex items-center gap-2">
+                <span>Sent Requests</span>
+                <span className="bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                  {outgoingRequests.length}
+                </span>
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {outgoingRequests.map((req: Friendship) => {
+                  const profile = req.recipient;
+                  const targetName = profile?.display_name || profile?.username || 'user';
+                  const targetUsername = profile?.username || 'user';
+                  return (
+                    <div
+                      key={req.id}
+                      className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center overflow-hidden">
+                          {profile?.avatar_url ? (
+                            <img src={profile.avatar_url} alt={targetUsername} className="w-full h-full object-cover" />
+                          ) : (
+                            <Users size={16} className="text-zinc-500" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-zinc-200">{targetName}</p>
+                          <p className="text-zinc-500 font-mono text-[11px]">@{targetUsername}</p>
+                          <p className="text-[10px] text-zinc-500 mt-0.5">Awaiting their acceptance</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCancelRequest(req.id)}
+                        className="px-2.5 py-1 text-[11px] rounded-lg border border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/10 transition-colors"
+                      >
+                        Cancel Request
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Accepted Friends List */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -212,12 +387,12 @@ export default function FriendsPage() {
 
             {acceptedFriends.length === 0 ? (
               <div className="p-8 text-center bg-zinc-900/30 rounded-2xl border border-zinc-800 text-xs text-zinc-500">
-                You haven't added any friends yet. Search for usernames above to connect!
+                You haven&apos;t added any friends yet. Search for usernames above to connect!
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {acceptedFriends.map(f => {
-                  const profile = f.requester;
+                {acceptedFriends.map((f: Friendship) => {
+                  const profile = f.requester_id === currentUser.id ? f.recipient : f.requester;
                   if (!profile) return null;
                   return (
                     <div

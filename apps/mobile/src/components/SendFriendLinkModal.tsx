@@ -26,15 +26,17 @@ export function SendFriendLinkModal({
   friendship,
   onClose,
 }: SendFriendLinkModalProps) {
-  const { sendLinkToFriend } = useApp();
+  const { currentUser, sendLinkToFriend } = useApp();
   const [url, setUrl] = useState('');
   const [comment, setComment] = useState('');
   const [isSending, setIsSending] = useState(false);
 
   if (!friendship) return null;
 
-  const friendUsername = friendship.requester?.username || 'friend';
-  const friendDisplayName = friendship.requester?.display_name || friendUsername;
+  const other = friendship.requester_id === currentUser.id ? friendship.recipient : friendship.requester;
+  const friendUsername = other?.username || 'friend';
+  const friendDisplayName = other?.display_name || friendUsername;
+  const recipientId = friendship.requester_id === currentUser.id ? friendship.recipient_id : friendship.requester_id;
 
   const handleSend = async () => {
     if (!url.trim()) {
@@ -47,7 +49,7 @@ export function SendFriendLinkModal({
       await sendLinkToFriend({
         url: url.trim(),
         comment: comment.trim() || null,
-        recipient_id: friendship.requester_id,
+        recipient_id: recipientId,
       });
 
       setUrl('');

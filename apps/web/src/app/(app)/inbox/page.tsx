@@ -131,7 +131,7 @@ export default function InboxPage() {
                       {send.comment && (
                         <div className="p-3 bg-zinc-950/70 rounded-xl border border-zinc-800/80 text-xs text-zinc-300 italic flex items-start gap-2">
                           <MessageSquare size={13} className="text-indigo-400 mt-0.5 flex-shrink-0" />
-                          <span>"{send.comment}"</span>
+                          <span>&quot;{send.comment}&quot;</span>
                         </div>
                       )}
                     </div>

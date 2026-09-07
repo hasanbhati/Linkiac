@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import { X, User, Send, Trash2, UserCheck, UserPlus, Clock } from 'lucide-react-native';
 import { Friendship } from '@linkiac/shared';
@@ -25,13 +26,17 @@ export function FriendDetailModal({
   onClose,
   onOpenSendModal,
 }: FriendDetailModalProps) {
-  const { acceptFriendRequest, removeFriend } = useApp();
+  const { currentUser, acceptFriendRequest, removeFriend } = useApp();
 
   if (!friendship) return null;
 
-  const username = friendship.requester?.username || 'user';
-  const displayName = friendship.requester?.display_name || username;
+  const other = friendship.requester_id === currentUser.id ? friendship.recipient : friendship.requester;
+  const username = other?.username || 'user';
+  const displayName = other?.display_name || username;
+  const avatarUrl = other?.avatar_url;
   const isAccepted = friendship.status === 'accepted';
+  const isIncoming = !isAccepted && friendship.recipient_id === currentUser.id;
+  const isOutgoing = !isAccepted && friendship.requester_id === currentUser.id;
 
   const handleAccept = async () => {
     try {
@@ -44,21 +49,31 @@ export function FriendDetailModal({
   };
 
   const handleRemove = () => {
-    Alert.alert(
-      isAccepted ? 'Remove Friend' : 'Decline Request',
-      `Are you sure you want to ${isAccepted ? 'remove' : 'decline'} @${username}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: isAccepted ? 'Remove' : 'Decline',
-          style: 'destructive',
-          onPress: async () => {
-            await removeFriend(friendship.id);
-            onClose();
-          },
+    let title = 'Remove Friend';
+    let message = `Are you sure you want to remove @${username} from your friends?`;
+    let confirmBtn = 'Remove';
+
+    if (isIncoming) {
+      title = 'Decline Request';
+      message = `Decline friend request from @${username}?`;
+      confirmBtn = 'Decline';
+    } else if (isOutgoing) {
+      title = 'Cancel Request';
+      message = `Cancel friend request sent to @${username}?`;
+      confirmBtn = 'Cancel Request';
+    }
+
+    Alert.alert(title, message, [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: confirmBtn,
+        style: 'destructive',
+        onPress: async () => {
+          await removeFriend(friendship.id);
+          onClose();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -84,7 +99,11 @@ export function FriendDetailModal({
           {/* Profile Details */}
           <View style={styles.profileSection}>
             <View style={styles.avatarLarge}>
-              <User color="#ffffff" size={36} />
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatarImgLarge} />
+              ) : (
+                <User color="#ffffff" size={36} />
+              )}
             </View>
             <Text style={styles.displayName}>{displayName}</Text>
             <Text style={styles.username}>@{username}</Text>
@@ -95,10 +114,15 @@ export function FriendDetailModal({
                   <UserCheck color="#34d399" size={14} />
                   <Text style={styles.badgeTextAccepted}>Connected Friends</Text>
                 </View>
-              ) : (
+              ) : isIncoming ? (
                 <View style={styles.badgePending}>
                   <Clock color="#a5b4fc" size={14} />
-                  <Text style={styles.badgeTextPending}>Friend Request Pending</Text>
+                  <Text style={styles.badgeTextPending}>Friend Request Received</Text>
+                </View>
+              ) : (
+                <View style={styles.badgePendingOutgoing}>
+                  <Clock color="#fbbf24" size={14} />
+                  <Text style={styles.badgeTextPendingOutgoing}>Request Sent (Pending)</Text>
                 </View>
               )}
             </View>
@@ -112,7 +136,7 @@ export function FriendDetailModal({
 
           {/* Action List */}
           <View style={styles.actionsSection}>
-            {isAccepted ? (
+            {isAccepted && (
               <TouchableOpacity
                 style={styles.actionPrimary}
                 onPress={() => {
@@ -123,7 +147,9 @@ export function FriendDetailModal({
                 <Send color="#ffffff" size={16} />
                 <Text style={styles.actionPrimaryText}>Send Link to @{username}</Text>
               </TouchableOpacity>
-            ) : (
+            )}
+
+            {isIncoming && (
               <TouchableOpacity
                 style={styles.actionPrimary}
                 onPress={handleAccept}
@@ -139,7 +165,11 @@ export function FriendDetailModal({
             >
               <Trash2 color="#ef4444" size={16} />
               <Text style={styles.actionDangerText}>
-                {isAccepted ? 'Remove Friend' : 'Decline Request'}
+                {isAccepted
+                  ? 'Remove Friend'
+                  : isIncoming
+                  ? 'Decline Request'
+                  : 'Cancel Sent Request'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -190,6 +220,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    overflow: 'hidden',
+  },
+  avatarImgLarge: {
+    width: '100%',
+    height: '100%',
   },
   displayName: {
     color: '#fafafa',
@@ -231,6 +266,20 @@ const styles = StyleSheet.create({
   },
   badgeTextPending: {
     color: '#a5b4fc',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  badgePendingOutgoing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#451a03',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  badgeTextPendingOutgoing: {
+    color: '#fbbf24',
     fontSize: 12,
     fontWeight: '600',
   },

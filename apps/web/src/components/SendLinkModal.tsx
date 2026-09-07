@@ -12,7 +12,7 @@ interface SendLinkModalProps {
 }
 
 export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProps) {
-  const { friends, sendLinkToFriends } = useApp();
+  const { currentUser, friends, sendLinkToFriends } = useApp();
 
   const [url, setUrl] = useState(sourceLink ? sourceLink.url : '');
   const [comment, setComment] = useState('');
@@ -127,7 +127,7 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
             ) : (
               <div className="space-y-1.5 max-h-40 overflow-y-auto p-1">
                 {acceptedFriends.map(f => {
-                  const friendProfile = f.requester;
+                  const friendProfile = f.requester_id === currentUser.id ? f.recipient : f.requester;
                   if (!friendProfile) return null;
                   const isChecked = selectedFriendIds.includes(friendProfile.id);
 

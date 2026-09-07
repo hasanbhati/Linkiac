@@ -255,7 +255,7 @@ export function LinkCard({
           {/* Personal Comment */}
           {link.comment && (
             <p className="text-xs text-zinc-400 italic line-clamp-2 bg-zinc-950/50 p-2 rounded-lg border border-zinc-800/60 mb-3">
-              "{link.comment}"
+              &quot;{link.comment}&quot;
             </p>
           )}
         </div>

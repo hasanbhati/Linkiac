@@ -11,7 +11,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { X, Bookmark, Tag as TagIcon, Check, Plus } from 'lucide-react-native';
+import { X, Bookmark, Tag as TagIcon, Check, Plus, Folder as FolderIcon } from 'lucide-react-native';
 import { ReadingStatus } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
 
@@ -21,13 +21,14 @@ interface SaveLinkModalProps {
 }
 
 export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
-  const { addLink, categories } = useApp();
+  const { addLink, categories, folders } = useApp();
 
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
   const [readingStatus, setReadingStatus] = useState<ReadingStatus>('to_read');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -39,6 +40,7 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
     setComment('');
     setReadingStatus('to_read');
     setSelectedCategoryId(null);
+    setSelectedFolderId(null);
     setTagInput('');
     setTags([]);
     setErrorMessage(null);
@@ -77,6 +79,7 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
         comment: comment.trim() || null,
         reading_status: readingStatus,
         category_id: selectedCategoryId,
+        folder_id: selectedFolderId,
         tags,
       });
 
@@ -252,6 +255,66 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                           ]}
                         >
                           {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Folder Selection */}
+            {folders.length > 0 && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Folder (Optional)</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryScroll}
+                >
+                  <TouchableOpacity
+                    onPress={() => setSelectedFolderId(null)}
+                    style={[
+                      styles.categoryChip,
+                      selectedFolderId === null && styles.categoryChipSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        selectedFolderId === null && styles.categoryChipTextSelected,
+                      ]}
+                    >
+                      None
+                    </Text>
+                  </TouchableOpacity>
+
+                  {(selectedCategoryId
+                    ? folders.filter(f => f.category_id === selectedCategoryId)
+                    : folders
+                  ).map(fld => {
+                    const isSelected = selectedFolderId === fld.id;
+                    return (
+                      <TouchableOpacity
+                        key={fld.id}
+                        onPress={() => setSelectedFolderId(isSelected ? null : fld.id)}
+                        style={[
+                          styles.categoryChip,
+                          isSelected && styles.categoryChipSelected,
+                        ]}
+                      >
+                        <FolderIcon
+                          color={isSelected ? '#ffffff' : '#f59e0b'}
+                          size={12}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text
+                          style={[
+                            styles.categoryChipText,
+                            isSelected && styles.categoryChipTextSelected,
+                          ]}
+                        >
+                          {fld.name}
                         </Text>
                       </TouchableOpacity>
                     );

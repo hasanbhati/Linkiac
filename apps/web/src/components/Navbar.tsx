@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Bookmark, Plus, Inbox, Shield, Sparkles, User, LogOut, Search } from 'lucide-react';
+import { Bookmark, Plus, Inbox, Shield, RefreshCw, User, LogOut, Search } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { SaveLinkModal } from './SaveLinkModal';
 
@@ -12,7 +12,7 @@ interface NavbarProps {
 }
 
 export function Navbar({ onSearchChange, searchQuery = '' }: NavbarProps) {
-  const { currentUser, suggestions, resetToSeed } = useApp();
+  const { currentUser, suggestions, syncAllFromSupabase, signOut } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -123,26 +123,27 @@ export function Navbar({ onSearchChange, searchQuery = '' }: NavbarProps) {
 
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       setShowUserMenu(false);
-                      if (confirm('Reset to initial demo seed data?')) {
-                        resetToSeed();
-                        window.location.reload();
-                      }
+                      await syncAllFromSupabase();
                     }}
-                    className="w-full text-left px-4 py-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 flex items-center gap-2"
+                    className="w-full text-left px-4 py-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 flex items-center gap-2 transition-colors"
                   >
-                    <Sparkles size={13} className="text-amber-400" />
-                    <span>Reset Demo Data</span>
+                    <RefreshCw size={13} className="text-indigo-400" />
+                    <span>Sync Library</span>
                   </button>
 
-                  <Link
-                    href="/login"
-                    onClick={() => setShowUserMenu(false)}
-                    className="block px-4 py-2 text-red-400 hover:bg-zinc-800"
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowUserMenu(false);
+                      await signOut();
+                    }}
+                    className="w-full text-left px-4 py-2 text-red-400 hover:bg-zinc-800 hover:text-red-300 flex items-center gap-2 transition-colors"
                   >
-                    Sign Out
-                  </Link>
+                    <LogOut size={13} />
+                    <span>Sign Out</span>
+                  </button>
                 </div>
               )}
             </div>

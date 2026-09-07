@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Globe,
   Tag as TagIcon,
+  Folder,
 } from 'lucide-react-native';
 import { Link, ReadingStatus, isSafeWebUrl, ensureUrlProtocol } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
@@ -32,7 +33,7 @@ interface LinkDetailModalProps {
 }
 
 export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps) {
-  const { updateLink, deleteLink } = useApp();
+  const { updateLink, deleteLink, categories, folders } = useApp();
 
   if (!link) return null;
 
@@ -177,6 +178,65 @@ export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps
                 })}
               </View>
             </View>
+
+            {/* Category */}
+            {categories.length > 0 && (
+              <View style={styles.categorizeSection}>
+                <Text style={styles.sectionLabel}>Category</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                  <TouchableOpacity
+                    onPress={() => updateLink(link.id, { category_id: null })}
+                    style={[styles.smallChip, !link.category_id && styles.smallChipActive]}
+                  >
+                    <Text style={[styles.smallChipText, !link.category_id && styles.smallChipTextActive]}>None</Text>
+                  </TouchableOpacity>
+                  {categories.map(c => {
+                    const isSelected = link.category_id === c.id;
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        onPress={() => updateLink(link.id, { category_id: isSelected ? null : c.id })}
+                        style={[styles.smallChip, isSelected && styles.smallChipActive]}
+                      >
+                        <TagIcon color={isSelected ? '#ffffff' : '#818cf8'} size={11} style={{ marginRight: 4 }} />
+                        <Text style={[styles.smallChipText, isSelected && styles.smallChipTextActive]}>{c.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Folder */}
+            {folders.length > 0 && (
+              <View style={styles.categorizeSection}>
+                <Text style={styles.sectionLabel}>Folder</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                  <TouchableOpacity
+                    onPress={() => updateLink(link.id, { folder_id: null })}
+                    style={[styles.smallChip, !link.folder_id && styles.smallChipActive]}
+                  >
+                    <Text style={[styles.smallChipText, !link.folder_id && styles.smallChipTextActive]}>None</Text>
+                  </TouchableOpacity>
+                  {(link.category_id
+                    ? folders.filter(f => f.category_id === link.category_id)
+                    : folders
+                  ).map(f => {
+                    const isSelected = link.folder_id === f.id;
+                    return (
+                      <TouchableOpacity
+                        key={f.id}
+                        onPress={() => updateLink(link.id, { folder_id: isSelected ? null : f.id })}
+                        style={[styles.smallChip, isSelected && styles.smallChipActive]}
+                      >
+                        <Folder color={isSelected ? '#ffffff' : '#f59e0b'} size={11} style={{ marginRight: 4 }} />
+                        <Text style={[styles.smallChipText, isSelected && styles.smallChipTextActive]}>{f.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
 
             {/* Tags */}
             {link.tags && link.tags.length > 0 ? (
@@ -351,6 +411,36 @@ const styles = StyleSheet.create({
     color: '#a1a1aa',
     fontSize: 12,
     fontWeight: '500',
+  },
+  categorizeSection: {
+    marginBottom: 14,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  smallChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  smallChipActive: {
+    backgroundColor: '#312e81',
+    borderColor: '#6366f1',
+  },
+  smallChipText: {
+    color: '#a1a1aa',
+    fontSize: 11,
+  },
+  smallChipTextActive: {
+    color: '#c7d2fe',
+    fontWeight: '600',
   },
   tagsSection: {
     marginBottom: 16,

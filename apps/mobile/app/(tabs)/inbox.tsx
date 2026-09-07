@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import { Check, X, User, ExternalLink, Inbox as InboxIcon, MessageSquare } from 'lucide-react-native';
@@ -96,6 +97,7 @@ export default function MobileInboxScreen() {
         renderItem={({ item }) => {
           const senderUsername = item.send?.sender?.username || 'friend';
           const senderDisplayName = item.send?.sender?.display_name || senderUsername;
+          const senderAvatar = item.send?.sender?.avatar_url;
           const url = item.send?.url || '';
           const comment = item.send?.comment;
           const isProcessing = processingId === item.id;
@@ -106,7 +108,11 @@ export default function MobileInboxScreen() {
               {/* Sender info */}
               <View style={styles.senderRow}>
                 <View style={styles.avatarMini}>
-                  <User color="#818cf8" size={14} />
+                  {senderAvatar ? (
+                    <Image source={{ uri: senderAvatar }} style={styles.avatarImg} />
+                  ) : (
+                    <User color="#818cf8" size={14} />
+                  )}
                 </View>
                 <View>
                   <Text style={styles.senderText}>@{senderUsername}</Text>
@@ -117,21 +123,23 @@ export default function MobileInboxScreen() {
               </View>
 
               {/* URL - tap to preview */}
-              <TouchableOpacity
-                style={styles.urlTouchable}
-                activeOpacity={0.7}
-                onPress={() => handleOpenUrl(url)}
-              >
-                <Text style={styles.urlText} numberOfLines={2}>
-                  {url}
-                </Text>
-                {isWeb && (
-                  <View style={styles.previewTag}>
-                    <ExternalLink color="#818cf8" size={12} />
-                    <Text style={styles.previewTagText}>Tap to preview</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+              {url ? (
+                <TouchableOpacity
+                  style={styles.urlTouchable}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenUrl(url)}
+                >
+                  <Text style={styles.urlText} numberOfLines={2}>
+                    {url}
+                  </Text>
+                  {isWeb && (
+                    <View style={styles.previewTag}>
+                      <ExternalLink color="#818cf8" size={12} />
+                      <Text style={styles.previewTagText}>Tap to preview</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ) : null}
 
               {/* Sender's Comment / Note */}
               {comment ? (
@@ -218,6 +226,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#312e81',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
   },
   senderText: {
     color: '#818cf8',

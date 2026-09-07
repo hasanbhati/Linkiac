@@ -1,6 +1,8 @@
 -- ==============================================================================
--- Linkiac Unified Cross-Platform Sync Setup (Production PostgreSQL Backend)
--- Run this in your Supabase Dashboard: SQL Editor -> New Query -> Run
+-- [DEPRECATED / DO NOT RUN IN PRODUCTION OR STAGING]
+-- WARNING: This script was an unhardened development workaround that dropped
+-- relational foreign keys and bypassed multi-tenant Row-Level Security.
+-- Use canonical migrations in supabase/migrations/ instead.
 -- ==============================================================================
 
 -- 1. PROFILES: Relax auth.users FK for demo/system accounts and allow full access

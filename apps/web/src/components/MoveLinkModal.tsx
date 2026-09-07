@@ -75,7 +75,7 @@ export function MoveLinkModal({ isOpen, onClose, link }: MoveLinkModalProps) {
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
-          <p className="text-xs text-zinc-400 truncate font-medium">"{link.title || link.url}"</p>
+          <p className="text-xs text-zinc-400 truncate font-medium">&quot;{link.title || link.url}&quot;</p>
 
           <CustomSelect
             label="Folder"

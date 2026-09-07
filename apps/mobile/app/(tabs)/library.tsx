@@ -6,34 +6,77 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
+  ScrollView,
   Alert,
 } from 'react-native';
 import * as Linking from 'expo-linking';
-import { Plus, Search, ExternalLink, MoreHorizontal, BookOpen, Clock, CheckCircle2 } from 'lucide-react-native';
+import {
+  Plus,
+  Search,
+  ExternalLink,
+  MoreHorizontal,
+  BookOpen,
+  Clock,
+  CheckCircle2,
+  Folder,
+  Tag,
+  Layers,
+  FolderPlus,
+} from 'lucide-react-native';
 import { Link, isSafeWebUrl, ensureUrlProtocol } from '@linkiac/shared';
 import { useApp } from '../../src/context/AppContext';
 import { SaveLinkModal } from '../../src/components/SaveLinkModal';
 import { LinkDetailModal } from '../../src/components/LinkDetailModal';
+import { ManageFoldersModal } from '../../src/components/ManageFoldersModal';
 
 export default function MobileLibraryScreen() {
-  const { links } = useApp();
+  const { links, categories, folders } = useApp();
   const [search, setSearch] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null); // null = all, 'unfiled' = unfiled, or UUID
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
 
-  // Filter links by search query
+  // Available folders filtered by selected category if applicable
+  const availableFolders = useMemo(() => {
+    if (!selectedCategoryId || selectedCategoryId === 'unfiled') {
+      return folders;
+    }
+    return folders.filter(f => f.category_id === selectedCategoryId);
+  }, [folders, selectedCategoryId]);
+
+  // Filter links by search query, category, and folder
   const filteredLinks = useMemo(() => {
-    if (!search.trim()) return links;
-    const query = search.toLowerCase().trim();
     return links.filter(item => {
-      const matchTitle = item.title?.toLowerCase().includes(query);
-      const matchUrl = item.url.toLowerCase().includes(query);
-      const matchDomain = item.domain?.toLowerCase().includes(query);
-      const matchComment = item.comment?.toLowerCase().includes(query);
-      const matchTags = item.tags?.some(t => t.name.toLowerCase().includes(query));
-      return matchTitle || matchUrl || matchDomain || matchComment || matchTags;
+      // 1. Search filter
+      if (search.trim()) {
+        const query = search.toLowerCase().trim();
+        const matchTitle = item.title?.toLowerCase().includes(query);
+        const matchUrl = item.url.toLowerCase().includes(query);
+        const matchDomain = item.domain?.toLowerCase().includes(query);
+        const matchComment = item.comment?.toLowerCase().includes(query);
+        const matchTags = item.tags?.some(t => t.name.toLowerCase().includes(query));
+        if (!matchTitle && !matchUrl && !matchDomain && !matchComment && !matchTags) {
+          return false;
+        }
+      }
+
+      // 2. Category filter
+      if (selectedCategoryId === 'unfiled') {
+        if (item.category_id || item.folder_id) return false;
+      } else if (selectedCategoryId !== null) {
+        if (item.category_id !== selectedCategoryId) return false;
+      }
+
+      // 3. Folder filter
+      if (selectedFolderId !== null) {
+        if (item.folder_id !== selectedFolderId) return false;
+      }
+
+      return true;
     });
-  }, [links, search]);
+  }, [links, search, selectedCategoryId, selectedFolderId]);
 
   const handleLinkPress = async (item: Link) => {
     const isWeb = isSafeWebUrl(item.url);
@@ -45,7 +88,6 @@ export default function MobileLibraryScreen() {
         setSelectedLink(item);
       }
     } else {
-      // Arbitrary idea snippet, note, or broken link: open detail modal
       setSelectedLink(item);
     }
   };
@@ -96,6 +138,100 @@ export default function MobileLibraryScreen() {
         ) : null}
       </View>
 
+      {/* Category Pills Bar */}
+      <View style={styles.categoryBarContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
+          <TouchableOpacity
+            style={[styles.catPill, selectedCategoryId === null && styles.catPillActive]}
+            activeOpacity={0.8}
+            onPress={() => {
+              setSelectedCategoryId(null);
+              setSelectedFolderId(null);
+            }}
+          >
+            <Text style={[styles.catPillText, selectedCategoryId === null && styles.catPillTextActive]}>
+              All ({links.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.catPill, selectedCategoryId === 'unfiled' && styles.catPillActive]}
+            activeOpacity={0.8}
+            onPress={() => {
+              setSelectedCategoryId('unfiled');
+              setSelectedFolderId(null);
+            }}
+          >
+            <Text style={[styles.catPillText, selectedCategoryId === 'unfiled' && styles.catPillTextActive]}>
+              Unfiled ({links.filter(l => !l.category_id && !l.folder_id).length})
+            </Text>
+          </TouchableOpacity>
+
+          {categories.map(cat => {
+            const count = links.filter(l => l.category_id === cat.id).length;
+            const isSelected = selectedCategoryId === cat.id;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.catPill, isSelected && styles.catPillActive]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setSelectedCategoryId(isSelected ? null : cat.id);
+                  setSelectedFolderId(null);
+                }}
+              >
+                <Tag color={isSelected ? '#ffffff' : '#818cf8'} size={12} style={{ marginRight: 4 }} />
+                <Text style={[styles.catPillText, isSelected && styles.catPillTextActive]}>
+                  {cat.name} ({count})
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          <TouchableOpacity
+            style={styles.managePill}
+            activeOpacity={0.8}
+            onPress={() => setIsManageModalOpen(true)}
+          >
+            <Layers color="#a1a1aa" size={13} style={{ marginRight: 4 }} />
+            <Text style={styles.managePillText}>+ Organize</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+
+      {/* Folder Pills Bar (shown if folders exist) */}
+      {availableFolders.length > 0 && selectedCategoryId !== 'unfiled' && (
+        <View style={styles.folderBarContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.folderScroll}>
+            <TouchableOpacity
+              style={[styles.folderChip, selectedFolderId === null && styles.folderChipActive]}
+              onPress={() => setSelectedFolderId(null)}
+            >
+              <Text style={[styles.folderChipText, selectedFolderId === null && styles.folderChipTextActive]}>
+                All Folders
+              </Text>
+            </TouchableOpacity>
+
+            {availableFolders.map(f => {
+              const fCount = links.filter(l => l.folder_id === f.id).length;
+              const isSelected = selectedFolderId === f.id;
+              return (
+                <TouchableOpacity
+                  key={f.id}
+                  style={[styles.folderChip, isSelected && styles.folderChipActive]}
+                  onPress={() => setSelectedFolderId(isSelected ? null : f.id)}
+                >
+                  <Folder color={isSelected ? '#ffffff' : '#f59e0b'} size={12} style={{ marginRight: 4 }} />
+                  <Text style={[styles.folderChipText, isSelected && styles.folderChipTextActive]}>
+                    {f.name} ({fCount})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Quick Add Button */}
       <TouchableOpacity
         style={styles.addButton}
@@ -142,6 +278,29 @@ export default function MobileLibraryScreen() {
               <Text style={styles.cardUrl} numberOfLines={1}>
                 {item.url}
               </Text>
+
+              {/* Category & Folder Badges */}
+              {(() => {
+                const cat = categories.find(c => c.id === item.category_id);
+                const fld = folders.find(f => f.id === item.folder_id);
+                if (!cat && !fld) return null;
+                return (
+                  <View style={styles.cardMetaRow}>
+                    {cat && (
+                      <View style={styles.cardCatBadge}>
+                        <Tag color="#818cf8" size={10} />
+                        <Text style={styles.cardCatBadgeText}>{cat.name}</Text>
+                      </View>
+                    )}
+                    {fld && (
+                      <View style={styles.cardFolderBadge}>
+                        <Folder color="#f59e0b" size={10} />
+                        <Text style={styles.cardFolderBadgeText}>{fld.name}</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
 
               {item.comment ? (
                 <Text style={styles.commentText} numberOfLines={2}>
@@ -190,6 +349,12 @@ export default function MobileLibraryScreen() {
         link={selectedLink}
         onClose={() => setSelectedLink(null)}
       />
+
+      {/* Manage Folders & Categories Modal */}
+      <ManageFoldersModal
+        visible={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
+      />
     </View>
   );
 }
@@ -222,6 +387,121 @@ const styles = StyleSheet.create({
     color: '#a1a1aa',
     fontSize: 12,
     fontWeight: '500',
+  },
+  categoryBarContainer: {
+    marginBottom: 10,
+  },
+  categoryScroll: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  catPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  catPillActive: {
+    backgroundColor: '#4f46e5',
+    borderColor: '#6366f1',
+  },
+  catPillText: {
+    color: '#a1a1aa',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  catPillTextActive: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  managePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#1c1917',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  managePillText: {
+    color: '#d4d4d8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  folderBarContainer: {
+    marginBottom: 12,
+  },
+  folderScroll: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  folderChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  folderChipActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    borderColor: '#f59e0b',
+  },
+  folderChipText: {
+    color: '#a1a1aa',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  folderChipTextActive: {
+    color: '#fbbf24',
+    fontWeight: '600',
+  },
+  cardMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginVertical: 4,
+  },
+  cardCatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.25)',
+  },
+  cardCatBadgeText: {
+    color: '#a5b4fc',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  cardFolderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  cardFolderBadgeText: {
+    color: '#fbbf24',
+    fontSize: 10,
+    fontWeight: '600',
   },
   addButton: {
     flexDirection: 'row',

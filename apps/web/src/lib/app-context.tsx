@@ -27,6 +27,7 @@ interface AppContextType {
   suggestions: SendRecipient[];
   domainStats: DomainStat[];
   isLoaded: boolean;
+  signOut: () => Promise<void>;
   // Actions
   addLink: (link: {
     url: string;
@@ -65,7 +66,6 @@ interface AppContextType {
   acceptFriendRequest: (friendshipId: string) => Promise<void>;
   removeFriend: (friendshipId: string) => Promise<void>;
   importBookmarks: (items: ParsedBookmark[]) => Promise<{ importedCount: number; foldersCount: number }>;
-  resetToSeed: () => Promise<void>;
   syncAllFromSupabase: () => Promise<void>;
 }
 
@@ -98,20 +98,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [suggestions, setSuggestions] = useState<SendRecipient[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // Sign out handler (scoped locally to preserve sessions on other devices)
+  const signOut = useCallback(async () => {
+    try {
+      const supabase = getSupabase();
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (err) {
+      console.error('Sign out error:', err);
+    } finally {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
+      setLinks([]);
+      setCategories([]);
+      setFolders([]);
+      setTags([]);
+      setFriends([]);
+      setSuggestions([]);
+      window.location.href = '/login';
+    }
+  }, []);
+
   // Synchronize all domain entities from Supabase
   const syncAllFromSupabase = useCallback(async () => {
     try {
       const supabase = getSupabase();
 
-      // Check current auth session
-      const { data: sessionData } = await supabase.auth.getSession();
-      const authUser = sessionData?.session?.user;
-      if (authUser && isValidUUID(authUser.id)) {
+      // Check current authenticated user
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (!authUser || !isValidUUID(authUser.id)) {
+        return;
+      }
+
+      // Fetch active user profile from public.profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (profile) {
+        setCurrentUser(profile);
+      } else {
         setCurrentUser(prev => ({
           ...prev,
           id: authUser.id,
           username: authUser.user_metadata?.username || prev.username,
-          display_name: authUser.user_metadata?.display_name || prev.display_name,
+          display_name: authUser.user_metadata?.full_name || authUser.user_metadata?.display_name || prev.display_name,
         }));
       }
 
@@ -137,7 +173,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (linksRes.status === 'fulfilled' && !linksRes.value.error && Array.isArray(linksRes.value.data)) {
         const transformed: Link[] = linksRes.value.data.map((l: any) => ({
           id: l.id,
-          user_id: l.user_id || defaultCurrentUser.id,
+          user_id: l.user_id || authUser.id,
           url: l.url,
           title: l.title || null,
           comment: l.comment || null,
@@ -167,7 +203,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (suggestionsRes.status === 'fulfilled' && !suggestionsRes.value.error && Array.isArray(suggestionsRes.value.data)) {
-        setSuggestions(suggestionsRes.value.data);
+        const rawSuggestions: any[] = suggestionsRes.value.data;
+
+        // Check if any suggestions lack the joined send record
+        const missingSendIds = rawSuggestions.filter(s => !s.send && s.send_id).map(s => s.send_id);
+        const sendMap = new Map<string, any>();
+        if (missingSendIds.length > 0) {
+          const { data: fetchedSends } = await supabase.from('sends').select('*').in('id', missingSendIds);
+          (fetchedSends || []).forEach(snd => sendMap.set(snd.id, snd));
+        }
+
+        // Check if any send record lacks sender profile
+        const senderIds = new Set<string>();
+        rawSuggestions.forEach(s => {
+          const snd = s.send || sendMap.get(s.send_id);
+          if (snd && snd.sender_id && (!snd.sender || !snd.sender.username)) {
+            senderIds.add(snd.sender_id);
+          }
+        });
+
+        const profileMap = new Map<string, any>();
+        if (senderIds.size > 0) {
+          const { data: profiles } = await supabase.from('profiles').select('*').in('id', Array.from(senderIds));
+          (profiles || []).forEach(p => profileMap.set(p.id, p));
+        }
+
+        const hydrated: SendRecipient[] = rawSuggestions.map(s => {
+          const snd = s.send || sendMap.get(s.send_id);
+          if (!snd) return s;
+          const sender = snd.sender && snd.sender.username ? snd.sender : profileMap.get(snd.sender_id);
+          return {
+            ...s,
+            send: {
+              ...snd,
+              sender: sender || snd.sender || null,
+            },
+          };
+        });
+
+        setSuggestions(hydrated);
       }
 
       if (tagsRes.status === 'fulfilled' && !tagsRes.value.error && Array.isArray(tagsRes.value.data)) {
@@ -199,6 +273,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Initial background sync
     syncAllFromSupabase();
 
+    // Supabase auth state change subscription
+    const supabase = getSupabase();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await syncAllFromSupabase();
+      } else if (event === 'SIGNED_OUT') {
+        setLinks([]);
+        setCategories([]);
+        setFolders([]);
+        setTags([]);
+        setFriends([]);
+        setSuggestions([]);
+      }
+    });
+
     // Polling sync every 4 seconds for cross-device consistency
     const pollInterval = setInterval(() => {
       syncAllFromSupabase();
@@ -210,6 +301,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     document.addEventListener('visibilitychange', handleFocus);
 
     return () => {
+      subscription.unsubscribe();
       clearInterval(pollInterval);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
@@ -920,11 +1012,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { importedCount: newLinks.length, foldersCount: foldersCreated };
   };
 
-  const resetToSeed = async () => {
-    localStorage.removeItem(STORAGE_KEY);
-    await syncAllFromSupabase();
-  };
-
   return (
     <AppContext.Provider
       value={{
@@ -937,6 +1024,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         suggestions,
         domainStats,
         isLoaded,
+        signOut,
         addLink,
         updateLink,
         deleteLink,
@@ -954,7 +1042,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         acceptFriendRequest,
         removeFriend,
         importBookmarks,
-        resetToSeed,
         syncAllFromSupabase,
       }}
     >
