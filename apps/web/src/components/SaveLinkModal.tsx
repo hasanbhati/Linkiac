@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Link as LinkType, ReadingStatus } from '@linkiac/shared';
-import { X, Sparkles, Upload, Loader2, Bookmark, Folder, Tag as TagIcon } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link as LinkType, ReadingStatus, extractDefaultThumbnail } from '@linkiac/shared';
+import { X, Sparkles, Upload, Loader2, Bookmark, Folder, Tag as TagIcon, Image as ImageIcon, Trash2, Camera } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
+import { getSupabase } from '@/lib/supabase/client';
 import { CustomSelect, SelectOption } from './CustomSelect';
 
 interface SaveLinkModalProps {
@@ -13,7 +14,7 @@ interface SaveLinkModalProps {
 }
 
 export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps) {
-  const { categories, folders, addLink, updateLink } = useApp();
+  const { currentUser, categories, folders, addLink, updateLink } = useApp();
 
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
@@ -25,7 +26,10 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
   const [tagsList, setTagsList] = useState<string[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isFetchingPreview, setIsFetchingPreview] = useState(false);
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editLink) {
@@ -50,12 +54,48 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
     }
   }, [editLink, isOpen]);
 
-  if (!isOpen) return null;
+  // Auto-fetch preview on URL change with 500ms debounce
+  useEffect(() => {
+    const raw = url.trim();
+    if (!raw || editLink || !isOpen) return;
+
+    // Immediately set default thumbnail if no custom thumbnail
+    const defaultThumb = extractDefaultThumbnail(raw);
+    if (defaultThumb && !thumbnailUrl) {
+      setThumbnailUrl(defaultThumb);
+    }
+
+    const timer = setTimeout(async () => {
+      setIsFetchingPreview(true);
+      try {
+        const res = await fetch('/api/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: raw }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (data.title && !title) setTitle(data.title);
+          if (data.thumbnail_url) setThumbnailUrl(data.thumbnail_url);
+        }
+      } catch {
+        // Non-fatal, default thumbnail already in place
+      } finally {
+        setIsFetchingPreview(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [url, editLink, isOpen]);
 
   const handleFetchPreview = async () => {
     if (!url.trim()) return;
     setIsFetchingPreview(true);
     try {
+      const defaultThumb = extractDefaultThumbnail(url.trim());
+      if (defaultThumb && !thumbnailUrl) {
+        setThumbnailUrl(defaultThumb);
+      }
       const res = await fetch('/api/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,6 +110,51 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
       // Non-fatal, gracefully ignored per PRD
     } finally {
       setIsFetchingPreview(false);
+    }
+  };
+
+  const handleUrlChange = (newUrl: string) => {
+    setUrl(newUrl);
+    if (!thumbnailUrl && newUrl.trim()) {
+      const defaultThumb = extractDefaultThumbnail(newUrl.trim());
+      if (defaultThumb) {
+        setThumbnailUrl(defaultThumb);
+      }
+    }
+  };
+
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setThumbnailError('Thumbnail image must be under 5MB.');
+      return;
+    }
+
+    setIsUploadingThumbnail(true);
+    setThumbnailError(null);
+
+    try {
+      const supabase = getSupabase();
+      const fileExt = file.name.split('.').pop() || 'png';
+      const cleanFileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('thumbnails')
+        .upload(cleanFileName, file, { upsert: true });
+
+      if (uploadErr) {
+        throw new Error(uploadErr.message || 'Failed to upload thumbnail');
+      }
+
+      const { data: { publicUrl } } = supabase.storage.from('thumbnails').getPublicUrl(cleanFileName);
+      setThumbnailUrl(publicUrl);
+    } catch (err: any) {
+      setThumbnailError(err.message || 'Failed to upload thumbnail to storage.');
+    } finally {
+      setIsUploadingThumbnail(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -148,6 +233,8 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
     })),
   ];
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
       <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -199,7 +286,7 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
               required
               placeholder="Paste any URL, broken link, reel text, or sentence..."
               value={url}
-              onChange={e => setUrl(e.target.value)}
+              onChange={e => handleUrlChange(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
             />
           </div>
@@ -296,17 +383,90 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
             />
           </div>
 
-          {/* Custom Thumbnail URL */}
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
-              Thumbnail Image URL (optional)
-            </label>
+          {/* Thumbnail / Visual Cover */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                Thumbnail / Cover Image
+              </label>
+              {thumbnailUrl && (
+                <button
+                  type="button"
+                  onClick={() => setThumbnailUrl(null)}
+                  className="text-xs text-red-400 hover:text-red-300 font-medium inline-flex items-center gap-1"
+                >
+                  <Trash2 size={12} />
+                  <span>Remove cover</span>
+                </button>
+              )}
+            </div>
+
+            {thumbnailError && (
+              <div className="p-2 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg">
+                {thumbnailError}
+              </div>
+            )}
+
+            {thumbnailUrl ? (
+              <div className="relative w-full h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden group">
+                <img
+                  src={thumbnailUrl}
+                  alt="Thumbnail preview"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingThumbnail}
+                    className="px-3 py-1.5 rounded-lg bg-zinc-900/90 text-white text-xs font-medium hover:bg-zinc-800 flex items-center gap-1.5 shadow"
+                  >
+                    {isUploadingThumbnail ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />}
+                    <span>Replace Image</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setThumbnailUrl(null)}
+                    className="px-3 py-1.5 rounded-lg bg-red-600/90 text-white text-xs font-medium hover:bg-red-500 flex items-center gap-1.5 shadow"
+                  >
+                    <Trash2 size={12} />
+                    <span>Remove</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingThumbnail}
+                  className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-2 transition-colors disabled:opacity-50 flex-shrink-0"
+                >
+                  {isUploadingThumbnail ? (
+                    <Loader2 size={13} className="animate-spin text-indigo-400" />
+                  ) : (
+                    <Upload size={13} className="text-indigo-400" />
+                  )}
+                  <span>{isUploadingThumbnail ? 'Uploading...' : 'Upload Image'}</span>
+                </button>
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="Or paste direct image URL..."
+                    value={thumbnailUrl || ''}
+                    onChange={e => setThumbnailUrl(e.target.value || null)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                  />
+                </div>
+              </div>
+            )}
+
             <input
-              type="text"
-              placeholder="https://images.unsplash.com/... or paste image URL"
-              value={thumbnailUrl || ''}
-              onChange={e => setThumbnailUrl(e.target.value || null)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={handleThumbnailUpload}
+              className="hidden"
             />
           </div>
 

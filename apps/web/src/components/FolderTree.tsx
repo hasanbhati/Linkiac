@@ -23,7 +23,10 @@ interface FolderTreeProps {
   onSelectUnfiled: () => void;
   onSelectCategory: (id: string) => void;
   onSelectFolder: (id: string) => void;
-  onDropOnTarget?: (target: { type: 'all' | 'unfiled' | 'category' | 'folder'; id?: string }) => void;
+  onDropOnTarget?: (
+    target: { type: 'all' | 'unfiled' | 'category' | 'folder'; id?: string },
+    linkIds?: string[]
+  ) => void;
 }
 
 export function FolderTree({
@@ -74,17 +77,39 @@ export function FolderTree({
   // Drag over / drop helpers
   const handleDragOver = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     setDragOverTarget(targetId);
   };
 
-  const handleDragLeave = () => {
-    setDragOverTarget(null);
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Prevent flickering when hovering child elements
+    const related = e.relatedTarget as HTMLElement | null;
+    if (!related || !e.currentTarget.contains(related)) {
+      setDragOverTarget(null);
+    }
   };
 
   const handleDrop = (e: React.DragEvent, target: { type: 'all' | 'unfiled' | 'category' | 'folder'; id?: string }) => {
     e.preventDefault();
     setDragOverTarget(null);
-    if (onDropOnTarget) onDropOnTarget(target);
+
+    let ids: string[] = [];
+    try {
+      const jsonStr = e.dataTransfer.getData('application/json');
+      if (jsonStr) {
+        const parsed = JSON.parse(jsonStr);
+        if (Array.isArray(parsed.linkIds) && parsed.linkIds.length > 0) {
+          ids = parsed.linkIds;
+        }
+      }
+    } catch {}
+
+    if (ids.length === 0) {
+      const plainId = e.dataTransfer.getData('text/plain');
+      if (plainId) ids = [plainId];
+    }
+
+    if (onDropOnTarget) onDropOnTarget(target, ids);
   };
 
   // Count links in nodes
@@ -105,11 +130,11 @@ export function FolderTree({
           onDragLeave={handleDragLeave}
           onDrop={e => handleDrop(e, { type: 'folder', id: folder.id })}
           onClick={() => onSelectFolder(folder.id)}
-          className={`group flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs transition-colors cursor-pointer ${
+          className={`group flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs transition-all cursor-pointer ${
             isSelected
               ? 'bg-indigo-600/15 text-indigo-400 font-medium'
               : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
-          } ${isDragOver ? 'ring-2 ring-indigo-500 bg-indigo-500/20' : ''}`}
+          } ${isDragOver ? 'ring-2 ring-indigo-500 bg-indigo-600/30 text-white font-semibold shadow-lg shadow-indigo-500/20 scale-[1.02]' : ''}`}
           style={{ paddingLeft: `${Math.min(depth * 14 + 10, 80)}px` }}
         >
           <div className="flex items-center gap-1.5 truncate">
@@ -132,32 +157,42 @@ export function FolderTree({
             <span className="truncate">{folder.name}</span>
           </div>
 
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              type="button"
-              title="Add nested subfolder"
-              onClick={e => handleCreateSubfolder(folder.id, folder.category_id, e)}
-              className="p-1 hover:text-zinc-100 rounded"
-            >
-              <Plus size={12} />
-            </button>
-            <button
-              type="button"
-              title="Delete folder"
-              onClick={e => {
-                e.stopPropagation();
-                if (confirm(`Delete folder "${folder.name}" and subfolders? Contained links will become unfiled.`)) {
-                  deleteFolder(folder.id);
-                }
-              }}
-              className="p-1 hover:text-red-400 rounded"
-            >
-              <Trash2 size={12} />
-            </button>
-            {folderLinkCount > 0 && (
-              <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-full">
-                {folderLinkCount}
+          <div className="flex items-center gap-1">
+            {isDragOver ? (
+              <span className="text-[10px] font-bold text-indigo-200 bg-indigo-900/90 border border-indigo-400 px-1.5 py-0.5 rounded shadow-sm">
+                Drop to move
               </span>
+            ) : (
+              <>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    title="Add nested subfolder"
+                    onClick={e => handleCreateSubfolder(folder.id, folder.category_id, e)}
+                    className="p-1 hover:text-zinc-100 rounded"
+                  >
+                    <Plus size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete folder"
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (confirm(`Delete folder "${folder.name}" and subfolders? Contained links will become unfiled.`)) {
+                        deleteFolder(folder.id);
+                      }
+                    }}
+                    className="p-1 hover:text-red-400 rounded"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+                {folderLinkCount > 0 && (
+                  <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-full">
+                    {folderLinkCount}
+                  </span>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -179,19 +214,25 @@ export function FolderTree({
           onDragOver={e => handleDragOver(e, 'all')}
           onDragLeave={handleDragLeave}
           onDrop={e => handleDrop(e, { type: 'all' })}
-          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
             !selectedCategoryId && !selectedFolderId && !isUnfiledOnly
               ? 'bg-zinc-800 text-white shadow-sm'
               : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-          } ${dragOverTarget === 'all' ? 'ring-2 ring-indigo-500 bg-indigo-500/20' : ''}`}
+          } ${dragOverTarget === 'all' ? 'ring-2 ring-indigo-500 bg-indigo-600/30 text-white font-semibold scale-[1.02] shadow-lg shadow-indigo-500/20' : ''}`}
         >
           <span className="flex items-center gap-2">
             <Layers size={15} className="text-indigo-400" />
             <span>All Links</span>
           </span>
-          <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 px-2 py-0.5 rounded-full">
-            {totalLinksCount}
-          </span>
+          {dragOverTarget === 'all' ? (
+            <span className="text-[10px] font-bold text-indigo-200 bg-indigo-900/90 border border-indigo-400 px-1.5 py-0.5 rounded shadow-sm">
+              Drop to unfile
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 px-2 py-0.5 rounded-full">
+              {totalLinksCount}
+            </span>
+          )}
         </button>
 
         <button
@@ -200,19 +241,25 @@ export function FolderTree({
           onDragOver={e => handleDragOver(e, 'unfiled')}
           onDragLeave={handleDragLeave}
           onDrop={e => handleDrop(e, { type: 'unfiled' })}
-          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
             isUnfiledOnly
               ? 'bg-zinc-800 text-white shadow-sm'
               : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-          } ${dragOverTarget === 'unfiled' ? 'ring-2 ring-indigo-500 bg-indigo-500/20' : ''}`}
+          } ${dragOverTarget === 'unfiled' ? 'ring-2 ring-amber-500 bg-amber-600/20 text-white font-semibold scale-[1.02] shadow-lg shadow-amber-500/20' : ''}`}
         >
           <span className="flex items-center gap-2">
             <Inbox size={15} className="text-amber-400" />
             <span>Unfiled</span>
           </span>
-          <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 px-2 py-0.5 rounded-full">
-            {unfiledCount}
-          </span>
+          {dragOverTarget === 'unfiled' ? (
+            <span className="text-[10px] font-bold text-amber-300 bg-amber-950/90 border border-amber-500/40 px-1.5 py-0.5 rounded shadow-sm">
+              Drop to unfile
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 px-2 py-0.5 rounded-full">
+              {unfiledCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -264,39 +311,47 @@ export function FolderTree({
                   onDragLeave={handleDragLeave}
                   onDrop={e => handleDrop(e, { type: 'category', id: cat.id })}
                   onClick={() => onSelectCategory(cat.id)}
-                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${
                     isCatSelected
                       ? 'bg-indigo-600/15 text-indigo-400'
                       : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
-                  } ${isDragOver ? 'ring-2 ring-indigo-500 bg-indigo-500/20' : ''}`}
+                  } ${isDragOver ? 'ring-2 ring-indigo-500 bg-indigo-600/30 text-white font-semibold shadow-lg shadow-indigo-500/20 scale-[1.02]' : ''}`}
                 >
                   <span className="truncate flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                     <span>{cat.name}</span>
                   </span>
 
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      title="Add folder in this category"
-                      onClick={e => handleCreateSubfolder(null, cat.id, e)}
-                      className="p-1 hover:text-zinc-100 rounded"
-                    >
-                      <FolderPlus size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      title="Delete category"
-                      onClick={e => {
-                        e.stopPropagation();
-                        if (confirm(`Delete category "${cat.name}"? Contained folders and links will become standalone.`)) {
-                          deleteCategory(cat.id);
-                        }
-                      }}
-                      className="p-1 hover:text-red-400 rounded"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                  <div className="flex items-center gap-1">
+                    {isDragOver ? (
+                      <span className="text-[10px] font-bold text-indigo-200 bg-indigo-900/90 border border-indigo-400 px-1.5 py-0.5 rounded shadow-sm">
+                        Drop to move
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          title="Add folder in this category"
+                          onClick={e => handleCreateSubfolder(null, cat.id, e)}
+                          className="p-1 hover:text-zinc-100 rounded"
+                        >
+                          <FolderPlus size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          title="Delete category"
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (confirm(`Delete category "${cat.name}"? Contained folders and links will become standalone.`)) {
+                              deleteCategory(cat.id);
+                            }
+                          }}
+                          className="p-1 hover:text-red-400 rounded"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 

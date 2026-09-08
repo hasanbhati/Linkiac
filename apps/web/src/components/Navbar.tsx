@@ -16,7 +16,9 @@ export function Navbar({ onSearchChange, searchQuery = '' }: NavbarProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const pendingSuggestionsCount = suggestions.filter(s => s.status === 'pending').length;
+  const pendingSuggestionsCount = suggestions.filter(
+    s => s.status === 'pending' && s.recipient_id === currentUser.id
+  ).length;
 
   return (
     <>

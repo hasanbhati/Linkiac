@@ -28,14 +28,22 @@ import {
   Check,
   ChevronRight,
 } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { parseNetscapeBookmarks, generateNetscapeBookmarks } from '@linkiac/shared';
 import { useApp } from '../../src/context/AppContext';
 import { supabase } from '../../lib/supabase';
 
 export default function MobileSettingsScreen() {
-  const { currentUser, signOut, updateProfile } = useApp();
+  const { currentUser, links, categories, folders, signOut, updateProfile, importBookmarks } = useApp();
 
   // User email
   const [userEmail, setUserEmail] = useState('');
+
+  // Import / Export state
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Modals state
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -47,6 +55,7 @@ export default function MobileSettingsScreen() {
   const [editDisplayName, setEditDisplayName] = useState(currentUser.display_name || '');
   const [editAvatarUrl, setEditAvatarUrl] = useState(currentUser.avatar_url || '');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // Change Email form state
   const [newEmail, setNewEmail] = useState('');
@@ -72,12 +81,54 @@ export default function MobileSettingsScreen() {
     loadEmail();
   }, []);
 
-  // Sync edit profile form with currentUser
+  // Sync edit profile form with currentUser ONLY when modal opens (avoids polling overwrite)
   useEffect(() => {
-    setEditUsername(currentUser.username || '');
-    setEditDisplayName(currentUser.display_name || '');
-    setEditAvatarUrl(currentUser.avatar_url || '');
-  }, [currentUser]);
+    if (isEditProfileOpen) {
+      setEditUsername(currentUser.username || '');
+      setEditDisplayName(currentUser.display_name || '');
+      setEditAvatarUrl(currentUser.avatar_url || '');
+    }
+  }, [isEditProfileOpen]);
+
+  const handlePickAvatarPhoto = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (res.canceled || !res.assets || res.assets.length === 0) return;
+
+      const asset = res.assets[0];
+      if (asset.size && asset.size > 5 * 1024 * 1024) {
+        Alert.alert('File Too Large', 'Please select an image smaller than 5MB.');
+        return;
+      }
+
+      setIsUploadingPhoto(true);
+
+      const ext = asset.name?.split('.').pop() || 'jpg';
+      const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, blob, {
+          contentType: asset.mimeType || 'image/jpeg',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      setEditAvatarUrl(publicUrl);
+    } catch (err: any) {
+      Alert.alert('Upload Failed', err.message || 'Could not upload photo from device.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     const cleanUsername = editUsername.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
@@ -194,6 +245,131 @@ export default function MobileSettingsScreen() {
     );
   };
 
+  const handleImportBookmarks = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['text/html', 'application/xhtml+xml', '*/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (res.canceled || !res.assets || res.assets.length === 0) {
+        return;
+      }
+
+      setIsImporting(true);
+      const asset = res.assets[0];
+      const content = await FileSystem.readAsStringAsync(asset.uri);
+      const items = parseNetscapeBookmarks(content);
+
+      if (items.length === 0) {
+        Alert.alert(
+          'No Bookmarks Found',
+          'The selected file does not appear to contain valid Netscape/HTML bookmark structure.'
+        );
+        setIsImporting(false);
+        return;
+      }
+
+      // Check duplicates
+      const existingUrls = new Set(links.map((l) => l.url.toLowerCase().replace(/\/+$/, '')));
+      const newItems = items.filter(
+        (item) => !existingUrls.has(item.url.toLowerCase().replace(/\/+$/, ''))
+      );
+      const duplicateCount = items.length - newItems.length;
+
+      if (duplicateCount > 0) {
+        Alert.alert(
+          'Import Bookmarks',
+          `Parsed ${items.length} bookmarks.\n\n• ${newItems.length} new bookmark(s)\n• ${duplicateCount} duplicate(s) already in library\n\nChoose import mode:`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => setIsImporting(false),
+            },
+            {
+              text: 'Import New Only',
+              onPress: async () => {
+                try {
+                  const result = await importBookmarks(newItems);
+                  Alert.alert(
+                    'Import Complete',
+                    `Successfully imported ${result.importedCount} bookmark(s) and organized them into ${result.foldersCount} folder(s).`
+                  );
+                } catch (err: any) {
+                  Alert.alert('Import Failed', err.message || 'Could not import bookmarks.');
+                } finally {
+                  setIsImporting(false);
+                }
+              },
+            },
+            {
+              text: 'Import All',
+              onPress: async () => {
+                try {
+                  const result = await importBookmarks(items);
+                  Alert.alert(
+                    'Import Complete',
+                    `Successfully imported ${result.importedCount} bookmark(s) and organized them into ${result.foldersCount} folder(s).`
+                  );
+                } catch (err: any) {
+                  Alert.alert('Import Failed', err.message || 'Could not import bookmarks.');
+                } finally {
+                  setIsImporting(false);
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        const result = await importBookmarks(items);
+        Alert.alert(
+          'Import Complete',
+          `Successfully imported ${result.importedCount} bookmark(s) and organized them into ${result.foldersCount} folder(s).`
+        );
+        setIsImporting(false);
+      }
+    } catch (err: any) {
+      Alert.alert('Import Error', err.message || 'Failed to parse bookmarks file.');
+      setIsImporting(false);
+    }
+  };
+
+  const handleExportBookmarks = async () => {
+    if (links.length === 0) {
+      Alert.alert('Empty Library', 'You do not have any saved bookmarks to export.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const htmlContent = generateNetscapeBookmarks({ links, folders, categories });
+      const fileName = `linkiac_bookmarks_${new Date().toISOString().slice(0, 10)}.html`;
+      const rawBaseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
+      const baseDir = rawBaseDir.endsWith('/') ? rawBaseDir : `${rawBaseDir}/`;
+      const fileUri = `${baseDir}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(fileUri, htmlContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/html',
+          dialogTitle: 'Export Linkiac Bookmarks',
+          UTI: 'public.html',
+        });
+      } else {
+        Alert.alert('Export Saved', `Bookmark file saved to:\n${fileUri}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Export Failed', err.message || 'Could not export bookmark file.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <Text style={styles.heading}>Account & Settings</Text>
@@ -270,17 +446,39 @@ export default function MobileSettingsScreen() {
       {/* Bookmarks & Data Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Bookmarks & Data</Text>
-        <TouchableOpacity style={styles.row} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.row}
+          activeOpacity={0.7}
+          onPress={handleImportBookmarks}
+          disabled={isImporting}
+        >
           <View style={styles.rowLeft}>
-            <Upload color="#818cf8" size={18} />
-            <Text style={styles.rowText}>Import Browser Bookmarks (.html)</Text>
+            {isImporting ? (
+              <ActivityIndicator size="small" color="#818cf8" />
+            ) : (
+              <Upload color="#818cf8" size={18} />
+            )}
+            <Text style={styles.rowText}>
+              {isImporting ? 'Importing Bookmarks...' : 'Import Browser Bookmarks (.html)'}
+            </Text>
           </View>
           <ChevronRight color="#52525b" size={16} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.row} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.row}
+          activeOpacity={0.7}
+          onPress={handleExportBookmarks}
+          disabled={isExporting}
+        >
           <View style={styles.rowLeft}>
-            <Download color="#818cf8" size={18} />
-            <Text style={styles.rowText}>Export My Library (.html)</Text>
+            {isExporting ? (
+              <ActivityIndicator size="small" color="#818cf8" />
+            ) : (
+              <Download color="#818cf8" size={18} />
+            )}
+            <Text style={styles.rowText}>
+              {isExporting ? 'Exporting Library...' : 'Export My Library (.html)'}
+            </Text>
           </View>
           <ChevronRight color="#52525b" size={16} />
         </TouchableOpacity>
@@ -315,6 +513,43 @@ export default function MobileSettingsScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+              {/* Device Photo Upload & Live Avatar Preview */}
+              <View style={styles.modalAvatarSection}>
+                <View style={styles.modalAvatarWrapper}>
+                  {editAvatarUrl ? (
+                    <Image source={{ uri: editAvatarUrl }} style={styles.avatarImg} />
+                  ) : (
+                    <User color="#ffffff" size={32} />
+                  )}
+                  <TouchableOpacity
+                    style={styles.modalAvatarCameraBadge}
+                    activeOpacity={0.8}
+                    onPress={handlePickAvatarPhoto}
+                    disabled={isUploadingPhoto}
+                  >
+                    <Camera color="#ffffff" size={13} />
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.uploadDevicePhotoBtn}
+                  activeOpacity={0.8}
+                  onPress={handlePickAvatarPhoto}
+                  disabled={isUploadingPhoto}
+                >
+                  {isUploadingPhoto ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Upload color="#ffffff" size={14} />
+                      <Text style={styles.uploadDevicePhotoBtnText}>
+                        {editAvatarUrl ? 'Change Photo from Device' : 'Upload Photo from Device'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>USERNAME</Text>
                 <View style={styles.usernameInputWrap}>
@@ -344,22 +579,57 @@ export default function MobileSettingsScreen() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PROFILE PICTURE / AVATAR URL</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editAvatarUrl}
-                  onChangeText={setEditAvatarUrl}
-                  placeholder="https://example.com/avatar.jpg"
-                  placeholderTextColor="#52525b"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Text style={styles.inputHint}>Paste an image URL for your profile avatar.</Text>
+                <Text style={styles.inputLabel}>PROFILE PICTURE / AVATAR</Text>
+                {(() => {
+                  const isStorageAvatar = !!(
+                    editAvatarUrl &&
+                    (editAvatarUrl.includes('/storage/v1/object/public/avatars') ||
+                      editAvatarUrl.includes('/avatars/'))
+                  );
+
+                  if (isStorageAvatar) {
+                    return (
+                      <View style={styles.uploadedPhotoBadge}>
+                        <View style={styles.uploadedPhotoBadgeLeft}>
+                          <Check color="#34d399" size={14} />
+                          <Text style={styles.uploadedPhotoBadgeText}>
+                            Custom photo uploaded from device
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => setEditAvatarUrl('')}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.removeUploadedPhotoText}>Remove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <TextInput
+                      style={styles.textInput}
+                      value={editAvatarUrl}
+                      onChangeText={setEditAvatarUrl}
+                      placeholder="Or paste external image URL (https://...)"
+                      placeholderTextColor="#52525b"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  );
+                })()}
+                <Text style={styles.inputHint}>
+                  {editAvatarUrl &&
+                  (editAvatarUrl.includes('/storage/v1/object/public/avatars') ||
+                    editAvatarUrl.includes('/avatars/'))
+                    ? 'Your photo is securely stored in Linkiac avatars storage.'
+                    : 'Upload a picture from your device above or paste an image link.'}
+                </Text>
               </View>
 
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, isSavingProfile && styles.btnDisabled]}
-                disabled={isSavingProfile}
+                style={[styles.modalSubmitBtn, (isSavingProfile || isUploadingPhoto) && styles.btnDisabled]}
+                disabled={isSavingProfile || isUploadingPhoto}
                 onPress={handleSaveProfile}
               >
                 {isSavingProfile ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.modalSubmitBtnText}>Save Profile Changes</Text>}
@@ -699,5 +969,78 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.5,
+  },
+  modalAvatarSection: {
+    alignItems: 'center',
+    marginBottom: 18,
+    gap: 10,
+  },
+  modalAvatarWrapper: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#312e81',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    borderWidth: 2,
+    borderColor: '#4f46e5',
+    overflow: 'visible',
+  },
+  modalAvatarCameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#4f46e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#18181b',
+  },
+  uploadDevicePhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#27272a',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  uploadDevicePhotoBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  uploadedPhotoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.3)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  uploadedPhotoBadgeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  uploadedPhotoBadgeText: {
+    color: '#34d399',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  removeUploadedPhotoText: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

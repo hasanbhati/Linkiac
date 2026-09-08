@@ -21,12 +21,13 @@ import {
   Loader2,
   User,
   Camera,
+  Search,
 } from 'lucide-react';
 import { parseNetscapeBookmarks, ParsedBookmark } from '@linkiac/shared';
 import { getSupabase } from '@/lib/supabase/client';
 
 export default function SettingsPage() {
-  const { currentUser, links, folders, categories, importBookmarks, syncAllFromSupabase } = useApp();
+  const { currentUser, links, folders, categories, importBookmarks, syncAllFromSupabase, updateProfile } = useApp();
 
   // Profile & Username State
   const [username, setUsername] = useState(currentUser?.username || '');
@@ -57,6 +58,8 @@ export default function SettingsPage() {
   const [showImportReview, setShowImportReview] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importSearchQuery, setImportSearchQuery] = useState('');
 
   // Danger Zone
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
@@ -79,12 +82,15 @@ export default function SettingsPage() {
     fetchUserEmail();
   }, []);
 
-  // Sync profile state when currentUser loads or changes
+  const hasInitialized = React.useRef(false);
+
+  // Sync profile state when currentUser loads initially (avoids wiping form while typing)
   React.useEffect(() => {
-    if (currentUser) {
+    if (currentUser && !hasInitialized.current) {
       setUsername(currentUser.username || '');
       setDisplayName(currentUser.display_name || '');
       setAvatarUrl(currentUser.avatar_url || '');
+      hasInitialized.current = true;
     }
   }, [currentUser]);
 
@@ -102,46 +108,14 @@ export default function SettingsPage() {
 
     setProfileLoading(true);
     try {
-      const supabase = getSupabase();
-
-      // Check if another user already has this username
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', cleanUsername)
-        .neq('id', currentUser.id)
-        .maybeSingle();
-
-      if (existing) {
-        setProfileError(`Username @${cleanUsername} is already taken. Please choose another.`);
-        setProfileLoading(false);
-        return;
-      }
-
-      // Update public.profiles
-      const { error: profileErr } = await supabase
-        .from('profiles')
-        .update({
-          username: cleanUsername,
-          display_name: displayName.trim() || cleanUsername,
-          avatar_url: avatarUrl.trim() || null,
-        })
-        .eq('id', currentUser.id);
-
-      if (profileErr) throw profileErr;
-
-      // Update Supabase auth user metadata so session reflects new username & name
-      await supabase.auth.updateUser({
-        data: {
-          username: cleanUsername,
-          full_name: displayName.trim() || cleanUsername,
-          avatar_url: avatarUrl.trim() || null,
-        },
+      await updateProfile({
+        username: cleanUsername,
+        display_name: displayName.trim() || cleanUsername,
+        avatar_url: avatarUrl.trim() || null,
       });
 
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 4000);
-      await syncAllFromSupabase();
     } catch (err: any) {
       setProfileError(err.message || 'Failed to update profile');
     } finally {
@@ -179,9 +153,7 @@ export default function SettingsPage() {
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
       setAvatarUrl(publicUrl);
 
-      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', currentUser.id);
-      await supabase.auth.updateUser({ data: { avatar_url: publicUrl } });
-      await syncAllFromSupabase();
+      await updateProfile({ avatar_url: publicUrl });
     } catch (err: any) {
       setAvatarError(err.message || 'Failed to upload avatar image.');
     } finally {
@@ -193,10 +165,7 @@ export default function SettingsPage() {
   const handleRemoveAvatar = async () => {
     setAvatarUrl('');
     try {
-      const supabase = getSupabase();
-      await supabase.from('profiles').update({ avatar_url: null }).eq('id', currentUser.id);
-      await supabase.auth.updateUser({ data: { avatar_url: null } });
-      await syncAllFromSupabase();
+      await updateProfile({ avatar_url: null });
     } catch (err) {
       console.warn('Remove avatar error:', err);
     }
@@ -293,12 +262,22 @@ export default function SettingsPage() {
   // Confirm Import
   const handleConfirmImport = async () => {
     const toImport = parsedItems.filter(p => p.selected);
-    const result = await importBookmarks(toImport);
-    setImportResult(`Successfully imported ${result.importedCount} links across ${result.foldersCount} standalone folders!`);
-    setShowImportReview(false);
-    setParsedItems([]);
-    setImportFile(null);
-    setTimeout(() => setImportResult(null), 5000);
+    if (toImport.length === 0) return;
+
+    setIsImporting(true);
+    try {
+      const result = await importBookmarks(toImport);
+      setImportResult(`Successfully imported ${result.importedCount} links across ${result.foldersCount} standalone folders!`);
+      setShowImportReview(false);
+      setParsedItems([]);
+      setImportFile(null);
+      setImportSearchQuery('');
+      setTimeout(() => setImportResult(null), 6000);
+    } catch {
+      alert('Failed to import bookmarks. Please check your network and try again.');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   // Export Bookmarks
@@ -517,13 +496,32 @@ export default function SettingsPage() {
                 <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
                   Avatar Image URL (Optional)
                 </label>
-                <input
-                  type="url"
-                  placeholder="https://example.com/avatar.jpg"
-                  value={avatarUrl}
-                  onChange={e => setAvatarUrl(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                {avatarUrl && avatarUrl.includes('/storage/v1/object/public/avatars/') ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300">
+                    <span className="flex items-center gap-2 text-indigo-300 font-medium">
+                      <Check size={14} className="text-emerald-400" />
+                      Custom photo uploaded from device
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveAvatar}
+                      className="text-[11px] text-red-400 hover:text-red-300 font-medium transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    type="url"
+                    placeholder="https://example.com/avatar.jpg"
+                    value={avatarUrl}
+                    onChange={e => setAvatarUrl(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                )}
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  Upload an image above, or enter an external image URL.
+                </p>
               </div>
 
               <button
@@ -734,111 +732,196 @@ export default function SettingsPage() {
       </div>
 
       {/* Bookmark Import Review Modal (BMK-04) */}
-      {showImportReview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-6 flex flex-col max-h-[85vh] space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div>
-                <h3 className="font-semibold text-zinc-100 text-sm flex items-center gap-2">
-                  <Upload size={16} className="text-indigo-400" />
-                  <span>Review Bookmark Import ({parsedItems.length} items parsed)</span>
-                </h3>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Duplicates against your existing library are flagged. Check the links you want to import.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowImportReview(false)}
-                className="text-zinc-400 hover:text-white"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {showImportReview && (() => {
+        const duplicateCount = parsedItems.filter(p => p.isDuplicate).length;
+        const newCount = parsedItems.length - duplicateCount;
+        const selectedCount = parsedItems.filter(p => p.selected).length;
 
-            {/* Selection Toolbar */}
-            <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
-              <span className="font-medium">
-                {parsedItems.filter(p => p.selected).length} of {parsedItems.length} selected for import
-              </span>
-              <div className="flex gap-2">
+        const filteredParsedItems = parsedItems
+          .map((item, originalIndex) => ({ item, originalIndex }))
+          .filter(({ item }) => {
+            if (!importSearchQuery.trim()) return true;
+            const q = importSearchQuery.toLowerCase();
+            return (
+              item.title.toLowerCase().includes(q) ||
+              item.url.toLowerCase().includes(q) ||
+              item.folderPath.some(f => f.toLowerCase().includes(q))
+            );
+          });
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+            <div className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-6 flex flex-col max-h-[85vh] space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div>
+                  <h3 className="font-semibold text-zinc-100 text-sm flex items-center gap-2">
+                    <Upload size={16} className="text-indigo-400" />
+                    <span>Review Bookmark Import</span>
+                  </h3>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Review and customize which bookmarks to import into your library.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setParsedItems(prev => prev.map(p => ({ ...p, selected: true })))}
-                  className="hover:text-zinc-100 underline"
+                  disabled={isImporting}
+                  onClick={() => setShowImportReview(false)}
+                  className="text-zinc-400 hover:text-white disabled:opacity-50"
                 >
-                  Select All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setParsedItems(prev => prev.map(p => ({ ...p, selected: !p.isDuplicate })))}
-                  className="hover:text-zinc-100 underline"
-                >
-                  Select Non-Duplicates Only
+                  <X size={18} />
                 </button>
               </div>
-            </div>
 
-            {/* List */}
-            <div className="flex-1 overflow-y-auto space-y-2 border border-zinc-800 rounded-xl p-3 bg-zinc-950/70">
-              {parsedItems.map((item, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => {
-                    setParsedItems(prev =>
-                      prev.map((p, i) => (i === idx ? { ...p, selected: !p.selected } : p))
-                    );
-                  }}
-                  className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs cursor-pointer transition-colors ${
-                    item.selected
-                      ? 'bg-zinc-900 border-indigo-500/40'
-                      : 'bg-zinc-950/40 border-zinc-800/80 opacity-60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <div className="text-indigo-400">
-                      {item.selected ? <CheckSquare size={16} /> : <Square size={16} />}
-                    </div>
-                    <div className="truncate">
-                      <p className="font-medium text-zinc-200 truncate">{item.title}</p>
-                      <p className="text-[11px] font-mono text-zinc-500 truncate">{item.url}</p>
-                      {item.folderPath.length > 0 && (
-                        <p className="text-[10px] text-zinc-400">
-                          Folder: {item.folderPath.join(' > ')}
-                        </p>
+              {/* Stats & Breakdown Badges */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800/80 border border-zinc-700/60 text-xs text-zinc-300">
+                  <span className="text-zinc-400">Total:</span>
+                  <span className="font-semibold text-zinc-100">{parsedItems.length}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-xs text-emerald-400">
+                  <span>New Links:</span>
+                  <span className="font-semibold">{newCount}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-xs text-amber-400">
+                  <span>Duplicates:</span>
+                  <span className="font-semibold">{duplicateCount}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/25 text-xs text-indigo-400 ml-auto">
+                  <span>Selected:</span>
+                  <span className="font-semibold">{selectedCount}</span>
+                </div>
+              </div>
+
+              {/* In-Modal Search & Filter */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Filter parsed links by title, url, or folder..."
+                  value={importSearchQuery}
+                  onChange={e => setImportSearchQuery(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                {importSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setImportSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Selection Toolbar */}
+              <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
+                <span>
+                  Showing {filteredParsedItems.length} of {parsedItems.length} bookmarks
+                </span>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setParsedItems(prev => prev.map(p => ({ ...p, selected: true })))}
+                    className="hover:text-zinc-100 hover:underline transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-zinc-700">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setParsedItems(prev => prev.map(p => ({ ...p, selected: false })))}
+                    className="hover:text-zinc-100 hover:underline transition-colors"
+                  >
+                    Deselect All
+                  </button>
+                  <span className="text-zinc-700">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setParsedItems(prev => prev.map(p => ({ ...p, selected: !p.isDuplicate })))}
+                    className="hover:text-zinc-100 hover:underline transition-colors"
+                  >
+                    Select New Only
+                  </button>
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="flex-1 overflow-y-auto space-y-2 border border-zinc-800 rounded-xl p-3 bg-zinc-950/70 max-h-80">
+                {filteredParsedItems.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-zinc-500">
+                    No bookmarks match &quot;{importSearchQuery}&quot;
+                  </div>
+                ) : (
+                  filteredParsedItems.map(({ item, originalIndex }) => (
+                    <div
+                      key={originalIndex}
+                      onClick={() => {
+                        setParsedItems(prev =>
+                          prev.map((p, i) => (i === originalIndex ? { ...p, selected: !p.selected } : p))
+                        );
+                      }}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs cursor-pointer transition-colors ${
+                        item.selected
+                          ? 'bg-zinc-900 border-indigo-500/40'
+                          : 'bg-zinc-950/40 border-zinc-800/80 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <div className="text-indigo-400">
+                          {item.selected ? <CheckSquare size={16} /> : <Square size={16} />}
+                        </div>
+                        <div className="truncate">
+                          <p className="font-medium text-zinc-200 truncate">{item.title}</p>
+                          <p className="text-[11px] font-mono text-zinc-500 truncate">{item.url}</p>
+                          {item.folderPath.length > 0 && (
+                            <p className="text-[10px] text-zinc-400">
+                              Folder: {item.folderPath.join(' > ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {item.isDuplicate && (
+                        <span className="text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full flex-shrink-0">
+                          Duplicate
+                        </span>
                       )}
                     </div>
-                  </div>
+                  ))
+                )}
+              </div>
 
-                  {item.isDuplicate && (
-                    <span className="text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full flex-shrink-0">
-                      Duplicate
-                    </span>
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  disabled={isImporting}
+                  onClick={() => setShowImportReview(false)}
+                  className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isImporting || selectedCount === 0}
+                  onClick={handleConfirmImport}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-600/20 active:scale-95 transition-all flex items-center gap-2"
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Importing {selectedCount} Links...</span>
+                    </>
+                  ) : (
+                    <span>Confirm & Import {selectedCount} Links</span>
                   )}
-                </div>
-              ))}
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
-              <button
-                type="button"
-                onClick={() => setShowImportReview(false)}
-                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmImport}
-                className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 active:scale-95 transition-all"
-              >
-                Confirm & Import {parsedItems.filter(p => p.selected).length} Links
-              </button>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <MobileBottomNav />
     </div>

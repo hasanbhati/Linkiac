@@ -8,9 +8,11 @@ import { useApp } from '@/lib/app-context';
 
 export function MobileBottomNav() {
   const pathname = usePathname();
-  const { suggestions } = useApp();
+  const { currentUser, suggestions } = useApp();
 
-  const pendingCount = suggestions.filter(s => s.status === 'pending').length;
+  const pendingCount = suggestions.filter(
+    s => s.status === 'pending' && s.recipient_id === currentUser.id
+  ).length;
 
   const tabs = [
     { name: 'Library', href: '/library', icon: <Bookmark size={18} />, active: pathname.startsWith('/library') },

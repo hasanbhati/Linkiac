@@ -21,10 +21,12 @@ import {
 } from 'lucide-react';
 
 export default function InboxPage() {
-  const { suggestions, rejectSuggestion } = useApp();
+  const { currentUser, suggestions, rejectSuggestion } = useApp();
   const [acceptingItem, setAcceptingItem] = useState<SendRecipient | null>(null);
 
-  const pendingSuggestions = suggestions.filter(s => s.status === 'pending');
+  const pendingSuggestions = suggestions.filter(
+    s => s.status === 'pending' && s.recipient_id === currentUser.id
+  );
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">

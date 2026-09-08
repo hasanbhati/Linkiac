@@ -1,10 +1,17 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { Globe, BarChart2 } from 'lucide-react-native';
 import { useApp } from '../../src/context/AppContext';
 
 export default function MobileDashboardScreen() {
-  const { domainStats } = useApp();
+  const { domainStats, syncAllFromSupabase } = useApp();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncAllFromSupabase();
+    setRefreshing(false);
+  }, [syncAllFromSupabase]);
 
   return (
     <View style={styles.container}>
@@ -14,6 +21,14 @@ export default function MobileDashboardScreen() {
       <FlatList
         data={domainStats}
         keyExtractor={item => item.domain}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#6366f1"
+            colors={['#6366f1']}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <BarChart2 color="#3f3f46" size={48} />

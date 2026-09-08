@@ -9,6 +9,7 @@ import {
   Share,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import {
@@ -22,9 +23,11 @@ import {
   Globe,
   Tag as TagIcon,
   Folder,
+  Send,
 } from 'lucide-react-native';
-import { Link, ReadingStatus, isSafeWebUrl, ensureUrlProtocol } from '@linkiac/shared';
+import { Link, ReadingStatus, isSafeWebUrl, ensureUrlProtocol, extractDefaultThumbnail } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
+import { SendLinkToFriendsModal } from './SendLinkToFriendsModal';
 
 interface LinkDetailModalProps {
   visible: boolean;
@@ -34,6 +37,7 @@ interface LinkDetailModalProps {
 
 export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps) {
   const { updateLink, deleteLink, categories, folders } = useApp();
+  const [isSendFriendsOpen, setIsSendFriendsOpen] = React.useState(false);
 
   if (!link) return null;
 
@@ -116,6 +120,22 @@ export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps
           </View>
 
           <ScrollView style={styles.scrollArea} contentContainerStyle={styles.body}>
+            {/* Thumbnail Header */}
+            {(() => {
+              const effectiveThumbnail = link.thumbnail_url || extractDefaultThumbnail(link.url);
+              if (!effectiveThumbnail) return null;
+              const isFavicon = effectiveThumbnail.includes('google.com/s2/favicons');
+              return (
+                <View style={[styles.detailThumbnailContainer, isFavicon && styles.detailFaviconContainer]}>
+                  <Image
+                    source={{ uri: effectiveThumbnail }}
+                    style={isFavicon ? styles.detailFaviconImg : styles.detailThumbnailImg}
+                    resizeMode={isFavicon ? 'contain' : 'cover'}
+                  />
+                </View>
+              );
+            })()}
+
             {/* Title */}
             {link.title ? (
               <Text style={styles.title}>{link.title}</Text>
@@ -276,18 +296,29 @@ export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps
               </TouchableOpacity>
             ) : null}
 
+            <TouchableOpacity onPress={() => setIsSendFriendsOpen(true)} style={styles.actionIconBtn}>
+              <Send color="#818cf8" size={17} />
+              <Text style={styles.actionBtnLabel}>Send</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={handleShare} style={styles.actionIconBtn}>
-              <Share2 color="#d4d4d8" size={18} />
+              <Share2 color="#d4d4d8" size={17} />
               <Text style={styles.actionBtnLabel}>Share</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
-              <Trash2 color="#ef4444" size={18} />
+              <Trash2 color="#ef4444" size={17} />
               <Text style={styles.deleteBtnLabel}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
+
+      <SendLinkToFriendsModal
+        visible={isSendFriendsOpen}
+        links={[link]}
+        onClose={() => setIsSendFriendsOpen(false)}
+      />
     </Modal>
   );
 }
@@ -536,5 +567,29 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 13,
     fontWeight: '600',
+  },
+  detailThumbnailContainer: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    marginBottom: 14,
+  },
+  detailThumbnailImg: {
+    width: '100%',
+    height: '100%',
+  },
+  detailFaviconContainer: {
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#18181b',
+  },
+  detailFaviconImg: {
+    width: 48,
+    height: 48,
   },
 });

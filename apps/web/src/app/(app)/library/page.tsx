@@ -45,6 +45,7 @@ export default function LibraryPage() {
   const [editingLink, setEditingLink] = useState<LinkType | null>(null);
   const [sendingLink, setSendingLink] = useState<LinkType | null>(null);
   const [movingLink, setMovingLink] = useState<LinkType | null>(null);
+  const [toastNotice, setToastNotice] = useState<string | null>(null);
 
   // Active view header title
   const activeViewTitle = useMemo(() => {
@@ -125,19 +126,34 @@ export default function LibraryPage() {
   };
 
   // Drag and drop handler
-  const handleDropOnTarget = (target: { type: 'all' | 'unfiled' | 'category' | 'folder'; id?: string }) => {
-    // Moves currently selected links or dragged link
-    if (selectedLinkIds.length > 0) {
-      if (target.type === 'unfiled' || target.type === 'all') {
-        bulkMoveLinks(selectedLinkIds, null, null);
-      } else if (target.type === 'category' && target.id) {
-        bulkMoveLinks(selectedLinkIds, target.id, null);
-      } else if (target.type === 'folder' && target.id) {
-        const folder = folders.find(f => f.id === target.id);
-        bulkMoveLinks(selectedLinkIds, folder ? folder.category_id : null, target.id);
-      }
-      setSelectedLinkIds([]);
+  const handleDropOnTarget = (
+    target: { type: 'all' | 'unfiled' | 'category' | 'folder'; id?: string },
+    draggedIds?: string[]
+  ) => {
+    const idsToMove = (draggedIds && draggedIds.length > 0)
+      ? draggedIds
+      : (selectedLinkIds.length > 0 ? selectedLinkIds : []);
+
+    if (idsToMove.length === 0) return;
+
+    let targetLabel = 'Unfiled';
+    if (target.type === 'unfiled' || target.type === 'all') {
+      bulkMoveLinks(idsToMove, null, null);
+      targetLabel = target.type === 'all' ? 'All Links (Unfiled)' : 'Unfiled';
+    } else if (target.type === 'category' && target.id) {
+      const cat = categories.find(c => c.id === target.id);
+      bulkMoveLinks(idsToMove, target.id, null);
+      targetLabel = cat ? `Category "${cat.name}"` : 'Category';
+    } else if (target.type === 'folder' && target.id) {
+      const folder = folders.find(f => f.id === target.id);
+      bulkMoveLinks(idsToMove, folder ? folder.category_id : null, target.id);
+      targetLabel = folder ? `Folder "${folder.name}"` : 'Folder';
     }
+
+    setToastNotice(`Moved ${idsToMove.length} ${idsToMove.length === 1 ? 'link' : 'links'} to ${targetLabel}`);
+    setTimeout(() => setToastNotice(null), 3500);
+
+    setSelectedLinkIds(prev => prev.filter(id => !idsToMove.includes(id)));
   };
 
   return (
@@ -316,12 +332,22 @@ export default function LibraryPage() {
                   onEdit={l => setEditingLink(l)}
                   onSend={l => setSendingLink(l)}
                   onMove={l => setMovingLink(l)}
+                  selectedCount={selectedLinkIds.length}
+                  selectedLinkIds={selectedLinkIds}
                 />
               ))}
             </div>
           )}
         </main>
       </div>
+
+      {/* Floating Toast Notification */}
+      {toastNotice && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-indigo-600 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl shadow-indigo-600/50 border border-white/20 flex items-center gap-2 animate-bounce">
+          <CheckSquare size={14} />
+          <span>{toastNotice}</span>
+        </div>
+      )}
 
       {/* Floating Bulk Action Bar */}
       <BulkActionBar

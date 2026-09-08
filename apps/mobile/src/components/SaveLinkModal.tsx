@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -10,9 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { X, Bookmark, Tag as TagIcon, Check, Plus, Folder as FolderIcon } from 'lucide-react-native';
-import { ReadingStatus } from '@linkiac/shared';
+import { ReadingStatus, extractDefaultThumbnail } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
 
 interface SaveLinkModalProps {
@@ -31,6 +32,7 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -43,6 +45,7 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
     setSelectedFolderId(null);
     setTagInput('');
     setTags([]);
+    setThumbnailUrl('');
     setErrorMessage(null);
   };
 
@@ -50,6 +53,79 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
     resetForm();
     onClose();
   };
+
+  // Auto-fetch preview on mobile when URL changes
+  useEffect(() => {
+    const raw = url.trim();
+    if (!raw || !visible) return;
+
+    // Immediately set default thumbnail if no custom thumbnail
+    const defaultThumb = extractDefaultThumbnail(raw);
+    if (defaultThumb && !thumbnailUrl) {
+      setThumbnailUrl(defaultThumb);
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        // Fast-path oEmbed for YouTube
+        if (raw.includes('youtube.com') || raw.includes('youtu.be')) {
+          const ytMatch = raw.match(/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+          if (ytMatch && ytMatch[1]) {
+            const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(raw)}&format=json`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.title && !title) setTitle(data.title);
+              if (data.thumbnail_url) setThumbnailUrl(data.thumbnail_url);
+              return;
+            }
+          }
+        }
+
+        // Fast-path oEmbed for Spotify
+        if (raw.includes('spotify.com')) {
+          const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(raw)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.title && !title) setTitle(data.title);
+            if (data.thumbnail_url) setThumbnailUrl(data.thumbnail_url);
+            return;
+          }
+        }
+
+        // Direct HTML fetch using social crawler User-Agent
+        const res = await fetch(raw, {
+          headers: {
+            'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+            'Accept': 'text/html,application/xhtml+xml',
+          },
+        });
+        if (res.ok) {
+          const html = await res.text();
+          const titleMatch = html.substring(0, 200000).match(/<title[^>]*>([^<]+)<\/title>/i);
+          if (titleMatch && titleMatch[1] && !title) {
+            setTitle(titleMatch[1].trim());
+          }
+          const ogImg =
+            html.substring(0, 200000).match(/<meta[^>]+property=["']og:image(?::(?:url|secure_url))?["'][^>]+content=["']([^"']+)["']/i) ||
+            html.substring(0, 200000).match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::(?:url|secure_url))?["']/i) ||
+            html.substring(0, 200000).match(/<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i);
+          if (ogImg && ogImg[1]) {
+            let imgUrl = ogImg[1].trim();
+            if (!/^https?:\/\//i.test(imgUrl)) {
+              try {
+                imgUrl = new URL(imgUrl, raw).toString();
+              } catch {}
+            }
+            setThumbnailUrl(imgUrl);
+          }
+        }
+      } catch {
+        // Fallback default thumbnail already set
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [url, visible]);
 
   const handleAddTag = () => {
     const trimmed = tagInput.trim().replace(/^#/, '');
@@ -73,6 +149,9 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
     setErrorMessage(null);
 
     try {
+      const defaultThumb = extractDefaultThumbnail(url.trim());
+      const finalThumb = thumbnailUrl.trim() || defaultThumb || null;
+
       await addLink({
         url: url.trim(),
         title: title.trim() || null,
@@ -81,6 +160,7 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
         category_id: selectedCategoryId,
         folder_id: selectedFolderId,
         tags,
+        thumbnail_url: finalThumb,
       });
 
       handleClose();
@@ -143,6 +223,12 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                 onChangeText={text => {
                   setUrl(text);
                   if (errorMessage) setErrorMessage(null);
+                  if (!thumbnailUrl && text.trim()) {
+                    const defaultThumb = extractDefaultThumbnail(text.trim());
+                    if (defaultThumb) {
+                      setThumbnailUrl(defaultThumb);
+                    }
+                  }
                 }}
                 multiline
                 numberOfLines={3}
@@ -360,6 +446,34 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                   ))}
                 </View>
               )}
+            </View>
+
+            {/* Thumbnail Preview & URL */}
+            <View style={styles.inputGroup}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={styles.label}>Thumbnail / Cover Image</Text>
+                {thumbnailUrl ? (
+                  <TouchableOpacity onPress={() => setThumbnailUrl('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Remove</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {thumbnailUrl ? (
+                <View style={styles.thumbnailPreviewContainer}>
+                  <Image source={{ uri: thumbnailUrl }} style={styles.thumbnailPreviewImg} resizeMode="cover" />
+                </View>
+              ) : null}
+
+              <TextInput
+                style={styles.input}
+                placeholder="Auto-detected or paste custom image link..."
+                placeholderTextColor="#71717a"
+                value={thumbnailUrl}
+                onChangeText={setThumbnailUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
             </View>
           </ScrollView>
 
@@ -600,5 +714,19 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  thumbnailPreviewContainer: {
+    width: '100%',
+    height: 140,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#09090b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    marginBottom: 8,
+  },
+  thumbnailPreviewImg: {
+    width: '100%',
+    height: '100%',
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  RefreshControl,
 } from 'react-native';
 import { UserCheck, UserPlus, Search, Users, ChevronRight, User, Check, Sparkles } from 'lucide-react-native';
 import { Friendship, Profile } from '@linkiac/shared';
@@ -23,6 +24,13 @@ export default function MobileFriendsScreen() {
   const [query, setQuery] = useState('');
   const [selectedFriendship, setSelectedFriendship] = useState<Friendship | null>(null);
   const [sendFriendship, setSendFriendship] = useState<Friendship | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncAllFromSupabase();
+    setRefreshing(false);
+  }, [syncAllFromSupabase]);
 
   // Discover state
   const [discoverQuery, setDiscoverQuery] = useState('');
@@ -186,6 +194,14 @@ export default function MobileFriendsScreen() {
           <FlatList
             data={filteredFriends}
             keyExtractor={item => item.id}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#6366f1"
+                colors={['#6366f1']}
+              />
+            }
             contentContainerStyle={styles.list}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>

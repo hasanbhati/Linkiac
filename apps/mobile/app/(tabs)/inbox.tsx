@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,44 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  RefreshControl,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import * as Linking from 'expo-linking';
-import { Check, X, User, ExternalLink, Inbox as InboxIcon, MessageSquare } from 'lucide-react-native';
-import { isSafeWebUrl, ensureUrlProtocol } from '@linkiac/shared';
+import {
+  Check,
+  X,
+  User,
+  ExternalLink,
+  Inbox as InboxIcon,
+  MessageSquare,
+  Folder,
+  Tag,
+} from 'lucide-react-native';
+import { isSafeWebUrl, ensureUrlProtocol, SendRecipient } from '@linkiac/shared';
 import { useApp } from '../../src/context/AppContext';
 
 export default function MobileInboxScreen() {
-  const { suggestions, acceptSuggestion, rejectSuggestion } = useApp();
+  const { currentUser, suggestions, categories, folders, acceptSuggestion, rejectSuggestion, syncAllFromSupabase } = useApp();
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const pendingSuggestions = suggestions.filter(
+    s => s.status === 'pending' && s.recipient_id === currentUser.id
+  );
+
+  // Destination filing modal state
+  const [acceptingItem, setAcceptingItem] = useState<SendRecipient | null>(null);
+  const [targetCategoryId, setTargetCategoryId] = useState<string | null>(null);
+  const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
+  const [isAccepting, setIsAccepting] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncAllFromSupabase();
+    setRefreshing(false);
+  }, [syncAllFromSupabase]);
 
   const handleOpenUrl = async (rawUrl: string) => {
     if (!isSafeWebUrl(rawUrl)) {
@@ -56,20 +85,31 @@ export default function MobileInboxScreen() {
     );
   };
 
-  const handleAccept = async (id: string, url: string) => {
-    setProcessingId(id);
+  const handleOpenAcceptModal = (item: SendRecipient) => {
+    setAcceptingItem(item);
+    setTargetCategoryId(null);
+    setTargetFolderId(null);
+  };
+
+  const handleConfirmAccept = async () => {
+    if (!acceptingItem) return;
+    setIsAccepting(true);
     try {
-      const link = await acceptSuggestion(id);
+      const link = await acceptSuggestion(acceptingItem.id, {
+        category_id: targetCategoryId,
+        folder_id: targetFolderId,
+      });
       if (link) {
         Alert.alert(
           'Saved to Library!',
           'This suggestion has been accepted and added to your personal library.'
         );
       }
-    } catch (err) {
-      Alert.alert('Error', 'Failed to accept suggestion to library.');
+      setAcceptingItem(null);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to accept suggestion to library.');
     } finally {
-      setProcessingId(null);
+      setIsAccepting(false);
     }
   };
 
@@ -79,8 +119,16 @@ export default function MobileInboxScreen() {
       <Text style={styles.subheading}>Links sent privately from your accepted friends</Text>
 
       <FlatList
-        data={suggestions}
-        keyExtractor={item => item.id}
+        data={pendingSuggestions}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#6366f1"
+            colors={['#6366f1']}
+          />
+        }
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -165,22 +213,162 @@ export default function MobileInboxScreen() {
                   style={styles.acceptBtn}
                   activeOpacity={0.7}
                   disabled={isProcessing}
-                  onPress={() => handleAccept(item.id, url)}
+                  onPress={() => handleOpenAcceptModal(item)}
                 >
-                  {isProcessing ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
-                  ) : (
-                    <>
-                      <Check color="#ffffff" size={16} />
-                      <Text style={styles.acceptText}>Accept to Library</Text>
-                    </>
-                  )}
+                  <Check color="#ffffff" size={16} />
+                  <Text style={styles.acceptText}>Accept to Library</Text>
                 </TouchableOpacity>
               </View>
             </View>
           );
         }}
       />
+
+      {/* Accept & File Modal */}
+      <Modal
+        visible={!!acceptingItem}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAcceptingItem(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Save Suggestion</Text>
+              <TouchableOpacity onPress={() => setAcceptingItem(null)}>
+                <X color="#a1a1aa" size={20} />
+              </TouchableOpacity>
+            </View>
+
+            {acceptingItem && (
+              <View style={styles.modalItemPreview}>
+                <Text style={styles.modalSenderLabel}>
+                  From @{acceptingItem.send?.sender?.username || 'friend'}
+                </Text>
+                <Text style={styles.modalUrlPreview} numberOfLines={2}>
+                  {acceptingItem.send?.url}
+                </Text>
+                {acceptingItem.send?.comment ? (
+                  <Text style={styles.modalCommentPreview}>
+                    "{acceptingItem.send?.comment}"
+                  </Text>
+                ) : null}
+              </View>
+            )}
+
+            <Text style={styles.modalSectionTitle}>Choose Category</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modalScrollRow}>
+              <TouchableOpacity
+                style={[
+                  styles.modalPill,
+                  targetCategoryId === null && styles.modalPillActive,
+                ]}
+                onPress={() => {
+                  setTargetCategoryId(null);
+                  setTargetFolderId(null);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.modalPillText,
+                    targetCategoryId === null && styles.modalPillTextActive,
+                  ]}
+                >
+                  Unfiled
+                </Text>
+              </TouchableOpacity>
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[
+                    styles.modalPill,
+                    targetCategoryId === cat.id && styles.modalPillActive,
+                  ]}
+                  onPress={() => {
+                    setTargetCategoryId(cat.id);
+                    setTargetFolderId(null);
+                  }}
+                >
+                  <Tag color={targetCategoryId === cat.id ? '#ffffff' : '#818cf8'} size={12} style={{ marginRight: 4 }} />
+                  <Text
+                    style={[
+                      styles.modalPillText,
+                      targetCategoryId === cat.id && styles.modalPillTextActive,
+                    ]}
+                  >
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.modalSectionTitle}>Choose Folder (Optional)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modalScrollRow}>
+              <TouchableOpacity
+                style={[
+                  styles.modalPill,
+                  targetFolderId === null && styles.modalPillActive,
+                ]}
+                onPress={() => setTargetFolderId(null)}
+              >
+                <Text
+                  style={[
+                    styles.modalPillText,
+                    targetFolderId === null && styles.modalPillTextActive,
+                  ]}
+                >
+                  No Folder
+                </Text>
+              </TouchableOpacity>
+              {folders
+                .filter((f) => !targetCategoryId || f.category_id === targetCategoryId)
+                .map((f) => (
+                  <TouchableOpacity
+                    key={f.id}
+                    style={[
+                      styles.modalPill,
+                      targetFolderId === f.id && styles.modalPillActive,
+                    ]}
+                    onPress={() => setTargetFolderId(f.id)}
+                  >
+                    <Folder color={targetFolderId === f.id ? '#ffffff' : '#f59e0b'} size={12} style={{ marginRight: 4 }} />
+                    <Text
+                      style={[
+                        styles.modalPillText,
+                        targetFolderId === f.id && styles.modalPillTextActive,
+                      ]}
+                    >
+                      {f.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setAcceptingItem(null)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, isAccepting && { opacity: 0.6 }]}
+                disabled={isAccepting}
+                onPress={handleConfirmAccept}
+              >
+                {isAccepting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Check color="#ffffff" size={16} />
+                    <Text style={styles.modalSubmitText}>Save to Library</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -341,5 +529,123 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#18181b',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '85%',
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  modalTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  modalItemPreview: {
+    backgroundColor: '#121215',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    marginBottom: 14,
+  },
+  modalSenderLabel: {
+    color: '#818cf8',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  modalUrlPreview: {
+    color: '#fafafa',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  modalCommentPreview: {
+    color: '#a1a1aa',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 6,
+  },
+  modalSectionTitle: {
+    color: '#a1a1aa',
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  modalScrollRow: {
+    marginBottom: 10,
+  },
+  modalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#27272a',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  modalPillActive: {
+    backgroundColor: '#4f46e5',
+    borderColor: '#6366f1',
+  },
+  modalPillText: {
+    color: '#a1a1aa',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  modalPillTextActive: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#27272a',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#fafafa',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalSubmitBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#4f46e5',
+  },
+  modalSubmitText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

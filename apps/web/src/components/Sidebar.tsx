@@ -15,7 +15,10 @@ interface SidebarProps {
   onSelectUnfiled: () => void;
   onSelectCategory: (id: string) => void;
   onSelectFolder: (id: string) => void;
-  onDropOnTarget?: (target: { type: 'all' | 'unfiled' | 'category' | 'folder'; id?: string }) => void;
+  onDropOnTarget?: (
+    target: { type: 'all' | 'unfiled' | 'category' | 'folder'; id?: string },
+    linkIds?: string[]
+  ) => void;
 }
 
 export function Sidebar({
@@ -31,7 +34,9 @@ export function Sidebar({
   const pathname = usePathname();
   const { currentUser, suggestions } = useApp();
 
-  const pendingSuggestionsCount = suggestions.filter(s => s.status === 'pending').length;
+  const pendingSuggestionsCount = suggestions.filter(
+    s => s.status === 'pending' && s.recipient_id === currentUser.id
+  ).length;
 
   const navItems = [
     {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Link as LinkType, ReadingStatus, isSafeWebUrl, ensureUrlProtocol } from '@linkiac/shared';
+import { Link as LinkType, ReadingStatus, isSafeWebUrl, ensureUrlProtocol, extractDefaultThumbnail } from '@linkiac/shared';
 import {
   ExternalLink,
   MoreVertical,
@@ -25,6 +25,8 @@ interface LinkCardProps {
   onEdit: (link: LinkType) => void;
   onSend: (link: LinkType) => void;
   onMove: (link: LinkType) => void;
+  selectedCount?: number;
+  selectedLinkIds?: string[];
 }
 
 export function LinkCard({
@@ -34,14 +36,33 @@ export function LinkCard({
   onEdit,
   onSend,
   onMove,
+  selectedCount = 0,
+  selectedLinkIds = [],
 }: LinkCardProps) {
   const { updateLink, deleteLink } = useApp();
   const [showMenu, setShowMenu] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const isSafe = isSafeWebUrl(link.url);
   const clickableUrl = isSafe ? ensureUrlProtocol(link.url) : null;
+
+  const handleDragStart = (e: React.DragEvent) => {
+    if (showMenu || showStatusMenu) {
+      e.preventDefault();
+      return;
+    }
+    setIsDragging(true);
+    e.dataTransfer.effectAllowed = 'move';
+    const idsToMove = isSelected && selectedLinkIds.length > 0 ? selectedLinkIds : [link.id];
+    e.dataTransfer.setData('text/plain', link.id);
+    e.dataTransfer.setData('application/json', JSON.stringify({ linkIds: idsToMove }));
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
 
   const handleStatusChange = (status: ReadingStatus) => {
     updateLink(link.id, { reading_status: status });
@@ -70,12 +91,23 @@ export function LinkCard({
 
   return (
     <div
-      className={`group relative rounded-2xl border transition-all duration-200 overflow-hidden flex flex-col ${
+      draggable={!showMenu && !showStatusMenu}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      className={`group relative rounded-2xl border transition-all duration-200 overflow-hidden flex flex-col cursor-grab active:cursor-grabbing ${
+        isDragging ? 'opacity-40 scale-[0.98] border-dashed border-indigo-400 shadow-2xl' : ''
+      } ${
         isSelected
           ? 'bg-zinc-900 border-indigo-500 shadow-lg shadow-indigo-500/10 ring-2 ring-indigo-500/30'
           : 'bg-zinc-900/80 hover:bg-zinc-900 border-zinc-800 hover:border-zinc-700/80 shadow-md'
       }`}
     >
+      {/* Multi-Item Dragging Badge */}
+      {isDragging && isSelected && selectedCount > 1 && (
+        <div className="absolute top-2 right-2 z-30 bg-indigo-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-xl border border-white/20 animate-pulse">
+          Moving {selectedCount} items
+        </div>
+      )}
       {/* Checkbox for Bulk Selection */}
       <div className="absolute top-3 left-3 z-20">
         <button
@@ -96,26 +128,48 @@ export function LinkCard({
       </div>
 
       {/* Thumbnail Focal Point */}
-      <div className="relative w-full h-44 bg-zinc-950/90 overflow-hidden">
-        {link.thumbnail_url && !imageError ? (
-          <img
-            src={link.thumbnail_url}
-            alt={link.title || 'Link preview thumbnail'}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            onError={() => setImageError(true)}
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-zinc-900 to-zinc-950">
-            <Globe size={32} className="text-zinc-700 mb-2" />
-            <span className="text-xs text-zinc-500 font-mono line-clamp-1 max-w-[80%]">
-              {link.domain || 'Note / Raw Text'}
-            </span>
-          </div>
-        )}
+      {(() => {
+        const effectiveThumbnail = link.thumbnail_url || extractDefaultThumbnail(link.url);
+        return (
+          <div className="relative w-full h-44 bg-zinc-950/90 overflow-hidden">
+            {effectiveThumbnail && !imageError ? (
+              effectiveThumbnail.includes('google.com/s2/favicons') ? (
+                <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900">
+                  <div className="w-16 h-16 rounded-2xl bg-zinc-900/90 border border-zinc-700/60 p-3 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                    <img
+                      src={effectiveThumbnail}
+                      alt={link.title || link.domain || 'Domain icon'}
+                      className="w-10 h-10 object-contain rounded"
+                      onError={() => setImageError(true)}
+                      loading="lazy"
+                    />
+                  </div>
+                  {link.domain && (
+                    <span className="mt-2.5 text-xs text-zinc-400 font-medium tracking-wide font-mono">
+                      {link.domain}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <img
+                  src={effectiveThumbnail}
+                  alt={link.title || 'Link preview thumbnail'}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  onError={() => setImageError(true)}
+                  loading="lazy"
+                />
+              )
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-zinc-900 to-zinc-950">
+                <Globe size={32} className="text-zinc-700 mb-2" />
+                <span className="text-xs text-zinc-500 font-mono line-clamp-1 max-w-[80%]">
+                  {link.domain || 'Note / Raw Text'}
+                </span>
+              </div>
+            )}
 
-        {/* Status Pill on Thumbnail */}
-        <div className="absolute bottom-2.5 left-2.5 z-10">
+            {/* Status Pill on Thumbnail */}
+            <div className="absolute bottom-2.5 left-2.5 z-10">
           <div className="relative">
             <button
               type="button"
@@ -225,6 +279,8 @@ export function LinkCard({
           </div>
         </div>
       </div>
+    );
+  })()}
 
       {/* Card Body */}
       <div className="p-4 flex-1 flex flex-col justify-between">
