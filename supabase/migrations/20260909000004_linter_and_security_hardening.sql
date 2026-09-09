@@ -1,29 +1,46 @@
 -- Migration: 20260909000004_linter_and_security_hardening.sql
--- Description: Resolves all Supabase Database Linter warnings:
+-- Description: Resolves all Supabase Database Linter warnings dynamically:
 -- 1. Sets immutable search_path on all functions (fixes function_search_path_mutable)
 -- 2. Removes duplicate and broad listing policies on public buckets (fixes public_bucket_allows_listing)
 -- 3. Restricts EXECUTE permissions on SECURITY DEFINER functions (fixes anon_security_definer_function_executable)
 
 -- ==============================================================================
 -- 1. FIX FUNCTION SEARCH_PATH (MUTABLE SEARCH PATH WARNINGS)
+-- Dynamically discovers exact parameter signatures from PostgreSQL catalog
 -- ==============================================================================
 
-alter function public.check_folder_cycle(uuid, uuid) set search_path = public, pg_temp;
-alter function public.update_updated_at_column() set search_path = public, pg_temp;
-alter function public.get_folder_subtree(uuid) set search_path = public, pg_temp;
-alter function public.handle_new_user() set search_path = public, pg_temp;
-alter function public.protect_profile_privileged_fields() set search_path = public, pg_temp;
-alter function public.rls_auto_enable() set search_path = public, pg_temp;
-alter function public.delete_user_account() set search_path = public, pg_temp;
-alter function public.get_email_by_username(text, text) set search_path = public, pg_temp;
-alter function public.is_send_recipient(uuid, uuid) set search_path = public, pg_temp;
-alter function public.is_send_sender(uuid, uuid) set search_path = public, pg_temp;
-alter function public.accept_friend_suggestion(uuid, uuid, uuid, text) set search_path = public, pg_temp;
-alter function public.admin_get_users() set search_path = public, pg_temp;
-alter function public.admin_toggle_user_role(uuid, boolean) set search_path = public, pg_temp;
-alter function public.admin_toggle_user_status(uuid, text) set search_path = public, pg_temp;
-alter function public.admin_delete_user(uuid) set search_path = public, pg_temp;
-alter function public.send_link_to_recipients(text, text, uuid[], uuid, text, text) set search_path = public, pg_temp;
+DO $$
+DECLARE
+  func record;
+BEGIN
+  FOR func IN
+    SELECT n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) as args
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prokind IN ('f', 'p')
+      AND p.proname IN (
+        'check_folder_cycle',
+        'update_updated_at_column',
+        'get_folder_subtree',
+        'handle_new_user',
+        'protect_profile_privileged_fields',
+        'rls_auto_enable',
+        'delete_user_account',
+        'get_email_by_username',
+        'is_send_recipient',
+        'is_send_sender',
+        'accept_friend_suggestion',
+        'admin_get_users',
+        'admin_toggle_user_role',
+        'admin_toggle_user_status',
+        'admin_delete_user',
+        'send_link_to_recipients'
+      )
+  LOOP
+    EXECUTE format('ALTER FUNCTION %I.%I(%s) SET search_path = public, pg_temp;', func.nspname, func.proname, func.args);
+  END LOOP;
+END $$;
 
 -- ==============================================================================
 -- 2. STORAGE BUCKET LISTING POLICIES (FIXES public_bucket_allows_listing)
@@ -32,57 +49,77 @@ alter function public.send_link_to_recipients(text, text, uuid[], uuid, text, te
 -- ==============================================================================
 
 -- Clean up duplicate / broad SELECT policies on storage.objects
-drop policy if exists "Public thumbnails read" on storage.objects;
-drop policy if exists "Thumbnails are publicly readable" on storage.objects;
-drop policy if exists "Public avatars read" on storage.objects;
-drop policy if exists "Avatars are publicly readable" on storage.objects;
-drop policy if exists "Users can list own thumbnails" on storage.objects;
-drop policy if exists "Users can list own avatars" on storage.objects;
+DROP POLICY IF EXISTS "Public thumbnails read" ON storage.objects;
+DROP POLICY IF EXISTS "Thumbnails are publicly readable" ON storage.objects;
+DROP POLICY IF EXISTS "Public avatars read" ON storage.objects;
+DROP POLICY IF EXISTS "Avatars are publicly readable" ON storage.objects;
+DROP POLICY IF EXISTS "Users can list own thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Users can list own avatars" ON storage.objects;
 
 -- Only authenticated users can list objects in their own folder
-create policy "Users can list own thumbnails"
-  on storage.objects for select
-  to authenticated
-  using (
-    bucket_id = 'thumbnails' and
+CREATE POLICY "Users can list own thumbnails"
+  ON storage.objects FOR SELECT
+  TO authenticated
+  USING (
+    bucket_id = 'thumbnails' AND
     (storage.foldername(name))[1] = auth.uid()::text
   );
 
-create policy "Users can list own avatars"
-  on storage.objects for select
-  to authenticated
-  using (
-    bucket_id = 'avatars' and
+CREATE POLICY "Users can list own avatars"
+  ON storage.objects FOR SELECT
+  TO authenticated
+  USING (
+    bucket_id = 'avatars' AND
     (storage.foldername(name))[1] = auth.uid()::text
   );
 
 -- ==============================================================================
 -- 3. FUNCTION EXECUTION RESTRICTIONS (FIXES anon_security_definer_function_executable)
+-- Dynamically discovers exact parameter signatures to revoke anon & grant authenticated
 -- ==============================================================================
 
--- Trigger functions should never be callable by client RPC
-revoke execute on function public.handle_new_user() from public, anon;
-revoke execute on function public.protect_profile_privileged_fields() from public, anon;
-revoke execute on function public.rls_auto_enable() from public, anon;
+DO $$
+DECLARE
+  func record;
+BEGIN
+  -- Revoke EXECUTE from anon & public for internal triggers and admin RPCs
+  FOR func IN
+    SELECT n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) as args
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname IN (
+        'handle_new_user',
+        'protect_profile_privileged_fields',
+        'rls_auto_enable',
+        'admin_delete_user',
+        'admin_get_users',
+        'admin_toggle_user_role',
+        'admin_toggle_user_status',
+        'accept_friend_suggestion',
+        'delete_user_account',
+        'is_send_recipient',
+        'is_send_sender',
+        'send_link_to_recipients'
+      )
+  LOOP
+    EXECUTE format('REVOKE EXECUTE ON FUNCTION %I.%I(%s) FROM PUBLIC, anon;', func.nspname, func.proname, func.args);
+  END LOOP;
 
--- Admin RPCs should never be callable by anonymous users
-revoke execute on function public.admin_delete_user(uuid) from public, anon;
-revoke execute on function public.admin_get_users() from public, anon;
-revoke execute on function public.admin_toggle_user_role(uuid, boolean) from public, anon;
-revoke execute on function public.admin_toggle_user_status(uuid, text) from public, anon;
-
--- User RPCs should be restricted to authenticated users
-revoke execute on function public.accept_friend_suggestion(uuid, uuid, uuid, text) from public, anon;
-grant execute on function public.accept_friend_suggestion(uuid, uuid, uuid, text) to authenticated;
-
-revoke execute on function public.delete_user_account() from public, anon;
-grant execute on function public.delete_user_account() to authenticated;
-
-revoke execute on function public.is_send_recipient(uuid, uuid) from public, anon;
-grant execute on function public.is_send_recipient(uuid, uuid) to authenticated;
-
-revoke execute on function public.is_send_sender(uuid, uuid) from public, anon;
-grant execute on function public.is_send_sender(uuid, uuid) to authenticated;
-
-revoke execute on function public.send_link_to_recipients(text, text, uuid[], uuid, text, text) from public, anon;
-grant execute on function public.send_link_to_recipients(text, text, uuid[], uuid, text, text) to authenticated;
+  -- Grant EXECUTE to authenticated for standard user RPCs
+  FOR func IN
+    SELECT n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) as args
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname IN (
+        'accept_friend_suggestion',
+        'delete_user_account',
+        'is_send_recipient',
+        'is_send_sender',
+        'send_link_to_recipients'
+      )
+  LOOP
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %I.%I(%s) TO authenticated;', func.nspname, func.proname, func.args);
+  END LOOP;
+END $$;
