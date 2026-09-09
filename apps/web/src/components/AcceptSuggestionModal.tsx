@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SendRecipient, ReadingStatus } from '@linkiac/shared';
-import { X, Check, Folder, Layers, User } from 'lucide-react';
+import { SendRecipient, ReadingStatus, parseNormalizedDomain, unpackSharedComment } from '@linkiac/shared';
+import { X, Check, Folder, User } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { CustomSelect, SelectOption } from './CustomSelect';
 
@@ -13,20 +13,28 @@ interface AcceptSuggestionModalProps {
 }
 
 export function AcceptSuggestionModal({ isOpen, onClose, suggestion }: AcceptSuggestionModalProps) {
-  const { categories, folders, acceptSuggestion } = useApp();
+  const { folders, acceptSuggestion } = useApp();
 
+  const [title, setTitle] = useState('');
   const [folderId, setFolderId] = useState<string | null>(null);
-  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [readingStatus, setReadingStatus] = useState<ReadingStatus>('to_read');
   const [comment, setComment] = useState('');
 
   React.useEffect(() => {
     if (suggestion) {
       setFolderId(null);
-      setCategoryId(null);
       setReadingStatus(suggestion.reading_status || 'to_read');
       // PRD: By default copy sender comment to personal comment, editable before accepting
-      setComment(suggestion.send?.comment || '');
+      const { title: unpackedTitle, note: unpackedNote } = unpackSharedComment(suggestion.send?.comment);
+      setComment(unpackedNote || (unpackedTitle ? '' : (suggestion.send?.comment || '')));
+
+      const rawSendTitle = suggestion.send?.title ? String(suggestion.send.title).trim() : '';
+      const rawSourceTitle = suggestion.send?.source_link?.title ? String(suggestion.send.source_link.title).trim() : '';
+      let initialTitle = rawSendTitle || unpackedTitle || rawSourceTitle;
+      if (!initialTitle || initialTitle.toLowerCase().startsWith('shared by @')) {
+        initialTitle = (suggestion.send?.url ? parseNormalizedDomain(suggestion.send.url) : '') || suggestion.send?.url || '';
+      }
+      setTitle(initialTitle);
     }
   }, [suggestion, isOpen]);
 
@@ -34,7 +42,7 @@ export function AcceptSuggestionModal({ isOpen, onClose, suggestion }: AcceptSug
 
   const handleConfirm = (e: React.FormEvent) => {
     e.preventDefault();
-    acceptSuggestion(suggestion.id, categoryId, folderId, comment.trim() || null);
+    acceptSuggestion(suggestion.id, null, folderId, comment.trim() || null, title.trim() || null);
     onClose();
   };
 
@@ -44,15 +52,6 @@ export function AcceptSuggestionModal({ isOpen, onClose, suggestion }: AcceptSug
       value: f.id,
       label: f.name,
       icon: <Folder size={14} className="text-amber-400" />,
-    })),
-  ];
-
-  const categoryOptions: SelectOption[] = [
-    { value: 'none', label: 'No category' },
-    ...categories.map(c => ({
-      value: c.id,
-      label: c.name,
-      icon: <Layers size={14} className="text-indigo-400" />,
     })),
   ];
 
@@ -85,21 +84,31 @@ export function AcceptSuggestionModal({ isOpen, onClose, suggestion }: AcceptSug
             <p className="text-xs font-mono text-zinc-300 line-clamp-2">{suggestion.send.url}</p>
           </div>
 
-          {/* Filing Destinations */}
+          {/* Link Title */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                Link Title
+              </label>
+              <span className="text-[11px] text-zinc-500">Keep original or edit before saving</span>
+            </div>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Title for your library (keep or edit)..."
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* Filing Destination */}
           <CustomSelect
             label="File into Folder"
             value={folderId || 'none'}
             onChange={val => setFolderId(val === 'none' ? null : val)}
             options={folderOptions}
             placeholder="Select a folder"
-          />
-
-          <CustomSelect
-            label="Assign to Category"
-            value={categoryId || 'none'}
-            onChange={val => setCategoryId(val === 'none' ? null : val)}
-            options={categoryOptions}
-            placeholder="Select a category"
           />
 
           {/* Personal Comment */}

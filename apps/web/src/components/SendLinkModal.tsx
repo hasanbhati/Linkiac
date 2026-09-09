@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Link as LinkType } from '@linkiac/shared';
+import { Link as LinkType, parseNormalizedDomain } from '@linkiac/shared';
 import { X, Send, User, Check } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 
@@ -15,6 +15,7 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
   const { currentUser, friends, sendLinkToFriends } = useApp();
 
   const [url, setUrl] = useState(sourceLink ? sourceLink.url : '');
+  const [title, setTitle] = useState(sourceLink ? (sourceLink.title || '') : '');
   const [comment, setComment] = useState('');
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -23,8 +24,10 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
   React.useEffect(() => {
     if (sourceLink) {
       setUrl(sourceLink.url);
+      setTitle(sourceLink.title || parseNormalizedDomain(sourceLink.url) || '');
     } else {
       setUrl('');
+      setTitle('');
     }
     setComment('');
     setSelectedFriendIds([]);
@@ -44,6 +47,16 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
     }
   };
 
+  const handleUrlChange = (newUrl: string) => {
+    setUrl(newUrl);
+    if (!sourceLink && (!title || title === parseNormalizedDomain(url))) {
+      const domain = parseNormalizedDomain(newUrl);
+      if (domain) {
+        setTitle(domain);
+      }
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
@@ -57,8 +70,13 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
 
     setIsSending(true);
     try {
+      const trimmedUrl = url.trim();
+      const domainFallback = parseNormalizedDomain(trimmedUrl);
+      const effectiveTitle = title.trim() || sourceLink?.title || domainFallback || trimmedUrl;
+
       await sendLinkToFriends({
-        url: url.trim(),
+        url: trimmedUrl,
+        title: effectiveTitle,
         comment: comment.trim() || null,
         recipient_ids: selectedFriendIds,
         source_link_id: sourceLink ? sourceLink.id : null,
@@ -110,8 +128,25 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
               readOnly={!!sourceLink}
               placeholder="https://... or raw note"
               value={url}
-              onChange={e => setUrl(e.target.value)}
+              onChange={e => handleUrlChange(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+            />
+          </div>
+
+          {/* Link Title */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                Link Title
+              </label>
+              <span className="text-[11px] text-zinc-500">Visible to recipient</span>
+            </div>
+            <input
+              type="text"
+              placeholder="Title for this link (keep or edit)..."
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 

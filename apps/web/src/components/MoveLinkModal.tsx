@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Link as LinkType } from '@linkiac/shared';
-import { X, FolderInput, Folder, Layers } from 'lucide-react';
+import { X, FolderInput, Folder } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { CustomSelect, SelectOption } from './CustomSelect';
 
@@ -13,15 +13,13 @@ interface MoveLinkModalProps {
 }
 
 export function MoveLinkModal({ isOpen, onClose, link }: MoveLinkModalProps) {
-  const { categories, folders, updateLink } = useApp();
+  const { folders, updateLink } = useApp();
 
   const [folderId, setFolderId] = useState<string | null>(link?.folder_id || null);
-  const [categoryId, setCategoryId] = useState<string | null>(link?.category_id || null);
 
   React.useEffect(() => {
     if (link) {
       setFolderId(link.folder_id);
-      setCategoryId(link.category_id);
     }
   }, [link, isOpen]);
 
@@ -29,16 +27,9 @@ export function MoveLinkModal({ isOpen, onClose, link }: MoveLinkModalProps) {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    // If folder is picked, inherit that folder's category context
-    let finalCatId = categoryId;
-    if (folderId) {
-      const parentFolder = folders.find(f => f.id === folderId);
-      if (parentFolder) finalCatId = parentFolder.category_id;
-    }
-
     updateLink(link.id, {
       folder_id: folderId,
-      category_id: finalCatId,
+      category_id: null,
     });
     onClose();
   };
@@ -49,15 +40,6 @@ export function MoveLinkModal({ isOpen, onClose, link }: MoveLinkModalProps) {
       value: f.id,
       label: f.name,
       icon: <Folder size={14} className="text-amber-400" />,
-    })),
-  ];
-
-  const categoryOptions: SelectOption[] = [
-    { value: 'none', label: 'No category' },
-    ...categories.map(c => ({
-      value: c.id,
-      label: c.name,
-      icon: <Layers size={14} className="text-indigo-400" />,
     })),
   ];
 
@@ -78,17 +60,10 @@ export function MoveLinkModal({ isOpen, onClose, link }: MoveLinkModalProps) {
           <p className="text-xs text-zinc-400 truncate font-medium">&quot;{link.title || link.url}&quot;</p>
 
           <CustomSelect
-            label="Folder"
+            label="Destination Folder"
             value={folderId || 'none'}
             onChange={val => setFolderId(val === 'none' ? null : val)}
             options={folderOptions}
-          />
-
-          <CustomSelect
-            label="Category"
-            value={categoryId || 'none'}
-            onChange={val => setCategoryId(val === 'none' ? null : val)}
-            options={categoryOptions}
           />
 
           <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">

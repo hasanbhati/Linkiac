@@ -10,7 +10,6 @@ export const createLinkSchema = z.object({
   reading_status: readingStatusSchema.default('to_read'),
   category_id: z.string().uuid().optional().nullable(),
   folder_id: z.string().uuid().optional().nullable(),
-  tags: z.array(z.string().min(1).max(50)).optional(),
   thumbnail_url: z.string().optional().nullable(),
   thumbnail_source: z.enum(['auto', 'manual', 'none']).default('none'),
 });
@@ -35,6 +34,7 @@ export const moveFolderSchema = z.object({
 
 export const sendLinkSchema = z.object({
   url: z.string().min(1, 'URL or text is required'),
+  title: z.string().max(500).optional().nullable(),
   comment: z.string().max(2000).optional().nullable(),
   recipient_ids: z.array(z.string().uuid()).min(1, 'Select at least one recipient'),
   source_link_id: z.string().uuid().optional().nullable(),
@@ -47,17 +47,13 @@ export const bulkMoveSchema = z.object({
   folder_id: z.string().uuid().optional().nullable(),
 });
 
-export const bulkTagSchema = z.object({
-  link_ids: z.array(z.string().uuid()).min(1),
-  tags: z.array(z.string().min(1).max(50)).min(1),
-});
-
 export const bulkDeleteSchema = z.object({
   link_ids: z.array(z.string().uuid()).min(1),
 });
 
 export const acceptSuggestionSchema = z.object({
   send_recipient_id: z.string().uuid(),
+  title: z.string().max(500).optional().nullable(),
   category_id: z.string().uuid().optional().nullable(),
   folder_id: z.string().uuid().optional().nullable(),
   comment: z.string().max(2000).optional().nullable(),

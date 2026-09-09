@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseNormalizedDomain, isSafeWebUrl, extractDefaultThumbnail } from './url';
+import { parseNormalizedDomain, isSafeWebUrl, extractDefaultThumbnail, packSharedComment, unpackSharedComment } from './url';
 
 describe('parseNormalizedDomain', () => {
   it('parses standard https url', () => {
@@ -101,6 +101,42 @@ describe('extractDefaultThumbnail', () => {
   it('returns null for arbitrary non-URL text', () => {
     expect(extractDefaultThumbnail('random note without domain')).toBe(null);
     expect(extractDefaultThumbnail('')).toBe(null);
+  });
+});
+
+describe('packSharedComment & unpackSharedComment', () => {
+  it('packs title and note cleanly', () => {
+    const packed = packSharedComment('Marketing video', 'How to make videos of screenshot');
+    expect(packed).toBe('[Title: Marketing video]\nHow to make videos of screenshot');
+
+    const unpacked = unpackSharedComment(packed);
+    expect(unpacked.title).toBe('Marketing video');
+    expect(unpacked.note).toBe('How to make videos of screenshot');
+  });
+
+  it('packs title without note', () => {
+    const packed = packSharedComment('Marketing video', null);
+    expect(packed).toBe('[Title: Marketing video]');
+
+    const unpacked = unpackSharedComment(packed);
+    expect(unpacked.title).toBe('Marketing video');
+    expect(unpacked.note).toBe(null);
+  });
+
+  it('passes note without title directly', () => {
+    const packed = packSharedComment(null, 'Just a regular note');
+    expect(packed).toBe('Just a regular note');
+
+    const unpacked = unpackSharedComment(packed);
+    expect(unpacked.title).toBe(null);
+    expect(unpacked.note).toBe('Just a regular note');
+  });
+
+  it('handles null and whitespace safely', () => {
+    expect(packSharedComment(null, null)).toBe(null);
+    expect(packSharedComment('   ', '   ')).toBe(null);
+    expect(unpackSharedComment(null)).toEqual({ title: null, note: null });
+    expect(unpackSharedComment('')).toEqual({ title: null, note: null });
   });
 });
 

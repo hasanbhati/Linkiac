@@ -37,7 +37,7 @@ interface AdminUserRow {
 }
 
 export default function AdminPage() {
-  const { currentUser } = useApp();
+  const { currentUser, isLoaded } = useApp();
 
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -138,6 +138,16 @@ export default function AdminPage() {
   const activeUsers = users.filter(u => u.status === 'active').length;
   const suspendedUsers = users.filter(u => u.status === 'suspended').length;
   const totalPlatformLinks = users.reduce((acc, u) => acc + u.links_count, 0);
+
+  // Wait for auth session hydration to prevent false 403 flashes (BUG-01)
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mb-3" />
+        <p className="text-xs text-zinc-500 font-mono">Verifying authorization...</p>
+      </div>
+    );
+  }
 
   // Authorization Check (ADM-01)
   if (!currentUser.is_admin) {
@@ -259,17 +269,15 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto pb-24 md:pb-8">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
         <Sidebar
-          selectedCategoryId={null}
           selectedFolderId={null}
           isUnfiledOnly={false}
           onSelectAll={() => {}}
           onSelectUnfiled={() => {}}
-          onSelectCategory={() => {}}
           onSelectFolder={() => {}}
         />
 

@@ -86,12 +86,3 @@ insert into public.send_recipients (id, send_id, recipient_id, status, reading_s
 values
   ('60000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'pending', 'to_read', now() - interval '3 days')
 on conflict (id) do nothing;
-
--- 7. TAGS: Allow flexible access
-alter table public.tags alter column user_id drop not null;
-alter table public.tags drop constraint if exists tags_user_id_fkey;
-drop policy if exists "Dev allow all on tags" on public.tags;
-create policy "Dev allow all on tags" on public.tags for all using (true) with check (true);
-
-drop policy if exists "Dev allow all on link_tags" on public.link_tags;
-create policy "Dev allow all on link_tags" on public.link_tags for all using (true) with check (true);

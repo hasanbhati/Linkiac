@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -14,6 +15,7 @@ import {
 import * as Linking from 'expo-linking';
 import {
   X,
+  Plus,
   ExternalLink,
   Share2,
   Trash2,
@@ -21,23 +23,20 @@ import {
   BookOpen,
   CheckCircle2,
   Globe,
-  Tag as TagIcon,
   Folder,
   Send,
 } from 'lucide-react-native';
 import { Link, ReadingStatus, isSafeWebUrl, ensureUrlProtocol, extractDefaultThumbnail } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
-import { SendLinkToFriendsModal } from './SendLinkToFriendsModal';
-
 interface LinkDetailModalProps {
   visible: boolean;
   link: Link | null;
   onClose: () => void;
+  onShareToFriends?: (link: Link) => void;
 }
 
-export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps) {
-  const { updateLink, deleteLink, categories, folders } = useApp();
-  const [isSendFriendsOpen, setIsSendFriendsOpen] = React.useState(false);
+export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: LinkDetailModalProps) {
+  const { updateLink, deleteLink, folders } = useApp();
 
   if (!link) return null;
 
@@ -199,34 +198,6 @@ export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps
               </View>
             </View>
 
-            {/* Category */}
-            {categories.length > 0 && (
-              <View style={styles.categorizeSection}>
-                <Text style={styles.sectionLabel}>Category</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-                  <TouchableOpacity
-                    onPress={() => updateLink(link.id, { category_id: null })}
-                    style={[styles.smallChip, !link.category_id && styles.smallChipActive]}
-                  >
-                    <Text style={[styles.smallChipText, !link.category_id && styles.smallChipTextActive]}>None</Text>
-                  </TouchableOpacity>
-                  {categories.map(c => {
-                    const isSelected = link.category_id === c.id;
-                    return (
-                      <TouchableOpacity
-                        key={c.id}
-                        onPress={() => updateLink(link.id, { category_id: isSelected ? null : c.id })}
-                        style={[styles.smallChip, isSelected && styles.smallChipActive]}
-                      >
-                        <TagIcon color={isSelected ? '#ffffff' : '#818cf8'} size={11} style={{ marginRight: 4 }} />
-                        <Text style={[styles.smallChipText, isSelected && styles.smallChipTextActive]}>{c.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-
             {/* Folder */}
             {folders.length > 0 && (
               <View style={styles.categorizeSection}>
@@ -238,10 +209,7 @@ export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps
                   >
                     <Text style={[styles.smallChipText, !link.folder_id && styles.smallChipTextActive]}>None</Text>
                   </TouchableOpacity>
-                  {(link.category_id
-                    ? folders.filter(f => f.category_id === link.category_id)
-                    : folders
-                  ).map(f => {
+                  {folders.map(f => {
                     const isSelected = link.folder_id === f.id;
                     return (
                       <TouchableOpacity
@@ -258,21 +226,6 @@ export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps
               </View>
             )}
 
-            {/* Tags */}
-            {link.tags && link.tags.length > 0 ? (
-              <View style={styles.tagsSection}>
-                <Text style={styles.sectionLabel}>Tags</Text>
-                <View style={styles.tagsRow}>
-                  {link.tags.map(t => (
-                    <View key={t.id} style={styles.tagBadge}>
-                      <TagIcon color="#818cf8" size={11} />
-                      <Text style={styles.tagText}>#{t.name}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-
             {/* Meta info */}
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>
@@ -284,41 +237,54 @@ export function LinkDetailModal({ visible, link, onClose }: LinkDetailModalProps
             </View>
           </ScrollView>
 
-          {/* Action Footer */}
+          {/* Action Footer (Redesigned 2-Tier Layout) */}
           <View style={styles.footer}>
             {isWebUrl ? (
               <TouchableOpacity
                 onPress={handleOpenBrowser}
                 style={styles.openBrowserBtn}
+                activeOpacity={0.8}
               >
                 <ExternalLink color="#ffffff" size={16} />
                 <Text style={styles.openBrowserBtnText}>Open in Browser</Text>
               </TouchableOpacity>
             ) : null}
 
-            <TouchableOpacity onPress={() => setIsSendFriendsOpen(true)} style={styles.actionIconBtn}>
-              <Send color="#818cf8" size={17} />
-              <Text style={styles.actionBtnLabel}>Send</Text>
-            </TouchableOpacity>
+            <View style={styles.secondaryActionsRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (onShareToFriends) {
+                    onShareToFriends(link);
+                  }
+                }}
+                style={styles.actionIconBtn}
+                activeOpacity={0.7}
+              >
+                <Send color="#818cf8" size={15} />
+                <Text style={styles.actionBtnLabel}>Send</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity onPress={handleShare} style={styles.actionIconBtn}>
-              <Share2 color="#d4d4d8" size={17} />
-              <Text style={styles.actionBtnLabel}>Share</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleShare}
+                style={styles.actionIconBtn}
+                activeOpacity={0.7}
+              >
+                <Share2 color="#d4d4d8" size={15} />
+                <Text style={styles.actionBtnLabel}>Share</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
-              <Trash2 color="#ef4444" size={17} />
-              <Text style={styles.deleteBtnLabel}>Delete</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDelete}
+                style={styles.deleteBtn}
+                activeOpacity={0.7}
+              >
+                <Trash2 color="#ef4444" size={15} />
+                <Text style={styles.deleteBtnLabel}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
-
-      <SendLinkToFriendsModal
-        visible={isSendFriendsOpen}
-        links={[link]}
-        onClose={() => setIsSendFriendsOpen(false)}
-      />
     </Modal>
   );
 }
@@ -473,27 +439,6 @@ const styles = StyleSheet.create({
     color: '#c7d2fe',
     fontWeight: '600',
   },
-  tagsSection: {
-    marginBottom: 16,
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  tagBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#27272a',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  tagText: {
-    color: '#a5b4fc',
-    fontSize: 11,
-  },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -511,28 +456,37 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   footer: {
-    flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#27272a',
     gap: 10,
-    alignItems: 'center',
   },
   openBrowserBtn: {
-    flex: 2,
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 44,
+    gap: 8,
+    height: 46,
     backgroundColor: '#4f46e5',
-    borderRadius: 10,
+    borderRadius: 12,
+    shadowColor: '#4f46e5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 3,
   },
   openBrowserBtnText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  secondaryActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
   },
   actionIconBtn: {
     flex: 1,
@@ -540,7 +494,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    height: 44,
+    height: 42,
     backgroundColor: '#18181b',
     borderWidth: 1,
     borderColor: '#27272a',
@@ -557,8 +511,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    height: 44,
-    backgroundColor: '#450a0a',
+    height: 42,
+    backgroundColor: '#271214',
     borderWidth: 1,
     borderColor: '#7f1d1d',
     borderRadius: 10,

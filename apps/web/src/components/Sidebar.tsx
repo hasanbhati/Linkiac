@@ -8,26 +8,22 @@ import { useApp } from '@/lib/app-context';
 import { FolderTree } from './FolderTree';
 
 interface SidebarProps {
-  selectedCategoryId: string | null;
   selectedFolderId: string | null;
   isUnfiledOnly: boolean;
   onSelectAll: () => void;
   onSelectUnfiled: () => void;
-  onSelectCategory: (id: string) => void;
   onSelectFolder: (id: string) => void;
   onDropOnTarget?: (
-    target: { type: 'all' | 'unfiled' | 'category' | 'folder'; id?: string },
+    target: { type: 'all' | 'unfiled' | 'folder'; id?: string },
     linkIds?: string[]
   ) => void;
 }
 
 export function Sidebar({
-  selectedCategoryId,
   selectedFolderId,
   isUnfiledOnly,
   onSelectAll,
   onSelectUnfiled,
-  onSelectCategory,
   onSelectFolder,
   onDropOnTarget,
 }: SidebarProps) {
@@ -46,7 +42,7 @@ export function Sidebar({
       isActive: pathname.startsWith('/library'),
     },
     {
-      name: 'Suggestions Inbox',
+      name: 'Inbox',
       href: '/inbox',
       icon: <Inbox size={16} />,
       badge: pendingSuggestionsCount > 0 ? pendingSuggestionsCount : undefined,
@@ -84,7 +80,7 @@ export function Sidebar({
   const isLibraryPage = pathname.startsWith('/library');
 
   return (
-    <aside className="w-64 flex-shrink-0 hidden md:flex flex-col h-[calc(100vh-4.5rem)] sticky top-[4.5rem] border-r border-zinc-800/80 p-4 space-y-6 overflow-y-auto">
+    <aside className="w-64 flex-shrink-0 hidden md:flex flex-col h-full border-r border-zinc-800/80 p-4 space-y-6 overflow-y-auto">
       {/* Primary Workspaces */}
       <nav className="space-y-1">
         {navItems.map(item => (
@@ -118,12 +114,10 @@ export function Sidebar({
       {isLibraryPage && (
         <div className="pt-2 border-t border-zinc-800/80">
           <FolderTree
-            selectedCategoryId={selectedCategoryId}
             selectedFolderId={selectedFolderId}
             isUnfiledOnly={isUnfiledOnly}
             onSelectAll={onSelectAll}
             onSelectUnfiled={onSelectUnfiled}
-            onSelectCategory={onSelectCategory}
             onSelectFolder={onSelectFolder}
             onDropOnTarget={onDropOnTarget}
           />

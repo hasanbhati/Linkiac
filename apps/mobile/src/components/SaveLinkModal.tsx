@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { X, Bookmark, Tag as TagIcon, Check, Plus, Folder as FolderIcon } from 'lucide-react-native';
+import { X, Bookmark, Check, Plus, Folder as FolderIcon } from 'lucide-react-native';
 import { ReadingStatus, extractDefaultThumbnail } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
 
@@ -22,16 +22,13 @@ interface SaveLinkModalProps {
 }
 
 export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
-  const { addLink, categories, folders } = useApp();
+  const { addLink, folders } = useApp();
 
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
   const [readingStatus, setReadingStatus] = useState<ReadingStatus>('to_read');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -41,10 +38,7 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
     setTitle('');
     setComment('');
     setReadingStatus('to_read');
-    setSelectedCategoryId(null);
     setSelectedFolderId(null);
-    setTagInput('');
-    setTags([]);
     setThumbnailUrl('');
     setErrorMessage(null);
   };
@@ -57,7 +51,7 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
   // Auto-fetch preview on mobile when URL changes
   useEffect(() => {
     const raw = url.trim();
-    if (!raw || !visible) return;
+    if (!raw || !visible || !/^https?:\/\//i.test(raw)) return;
 
     // Immediately set default thumbnail if no custom thumbnail
     const defaultThumb = extractDefaultThumbnail(raw);
@@ -127,18 +121,6 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
     return () => clearTimeout(timer);
   }, [url, visible]);
 
-  const handleAddTag = () => {
-    const trimmed = tagInput.trim().replace(/^#/, '');
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
-      setTagInput('');
-    }
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(t => t !== tagToRemove));
-  };
-
   const handleSave = async () => {
     if (!url.trim()) {
       setErrorMessage('Please enter a URL, idea snippet, or note to save.');
@@ -157,9 +139,8 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
         title: title.trim() || null,
         comment: comment.trim() || null,
         reading_status: readingStatus,
-        category_id: selectedCategoryId,
+        category_id: null,
         folder_id: selectedFolderId,
-        tags,
         thumbnail_url: finalThumb,
       });
 
@@ -302,53 +283,6 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
               </View>
             </View>
 
-            {/* Category Selector (Optional) */}
-            {categories.length > 0 && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Category</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                  <TouchableOpacity
-                    onPress={() => setSelectedCategoryId(null)}
-                    style={[
-                      styles.categoryChip,
-                      selectedCategoryId === null && styles.categoryChipSelected,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        selectedCategoryId === null && styles.categoryChipTextSelected,
-                      ]}
-                    >
-                      Uncategorized
-                    </Text>
-                  </TouchableOpacity>
-                  {categories.map(cat => {
-                    const isSelected = selectedCategoryId === cat.id;
-                    return (
-                      <TouchableOpacity
-                        key={cat.id}
-                        onPress={() => setSelectedCategoryId(cat.id)}
-                        style={[
-                          styles.categoryChip,
-                          isSelected && styles.categoryChipSelected,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.categoryChipText,
-                            isSelected && styles.categoryChipTextSelected,
-                          ]}
-                        >
-                          {cat.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-
             {/* Folder Selection */}
             {folders.length > 0 && (
               <View style={styles.inputGroup}>
@@ -356,37 +290,34 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoryScroll}
+                  contentContainerStyle={styles.folderScroll}
                 >
                   <TouchableOpacity
                     onPress={() => setSelectedFolderId(null)}
                     style={[
-                      styles.categoryChip,
-                      selectedFolderId === null && styles.categoryChipSelected,
+                      styles.folderChip,
+                      selectedFolderId === null && styles.folderChipSelected,
                     ]}
                   >
                     <Text
                       style={[
-                        styles.categoryChipText,
-                        selectedFolderId === null && styles.categoryChipTextSelected,
+                        styles.folderChipText,
+                        selectedFolderId === null && styles.folderChipTextSelected,
                       ]}
                     >
                       None
                     </Text>
                   </TouchableOpacity>
 
-                  {(selectedCategoryId
-                    ? folders.filter(f => f.category_id === selectedCategoryId)
-                    : folders
-                  ).map(fld => {
+                  {folders.map(fld => {
                     const isSelected = selectedFolderId === fld.id;
                     return (
                       <TouchableOpacity
                         key={fld.id}
                         onPress={() => setSelectedFolderId(isSelected ? null : fld.id)}
                         style={[
-                          styles.categoryChip,
-                          isSelected && styles.categoryChipSelected,
+                          styles.folderChip,
+                          isSelected && styles.folderChipSelected,
                         ]}
                       >
                         <FolderIcon
@@ -396,8 +327,8 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                         />
                         <Text
                           style={[
-                            styles.categoryChipText,
-                            isSelected && styles.categoryChipTextSelected,
+                            styles.folderChipText,
+                            isSelected && styles.folderChipTextSelected,
                           ]}
                         >
                           {fld.name}
@@ -408,45 +339,6 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                 </ScrollView>
               </View>
             )}
-
-            {/* Tags */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Tags</Text>
-              <View style={styles.tagInputRow}>
-                <TextInput
-                  style={[styles.input, styles.tagTextInput]}
-                  placeholder="Add tag (e.g. frontend, ai)"
-                  placeholderTextColor="#71717a"
-                  value={tagInput}
-                  onChangeText={setTagInput}
-                  onSubmitEditing={handleAddTag}
-                  returnKeyType="done"
-                />
-                <TouchableOpacity
-                  onPress={handleAddTag}
-                  style={styles.addTagBtn}
-                  disabled={!tagInput.trim()}
-                >
-                  <Plus color="#ffffff" size={16} />
-                </TouchableOpacity>
-              </View>
-              {tags.length > 0 && (
-                <View style={styles.tagsContainer}>
-                  {tags.map(t => (
-                    <View key={t} style={styles.tagBadge}>
-                      <TagIcon color="#818cf8" size={12} />
-                      <Text style={styles.tagBadgeText}>#{t}</Text>
-                      <TouchableOpacity
-                        onPress={() => handleRemoveTag(t)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <X color="#a1a1aa" size={12} />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
 
             {/* Thumbnail Preview & URL */}
             <View style={styles.inputGroup}>
@@ -620,10 +512,10 @@ const styles = StyleSheet.create({
   statusPillTextSelected: {
     color: '#ffffff',
   },
-  categoryScroll: {
+  folderScroll: {
     flexDirection: 'row',
   },
-  categoryChip: {
+  folderChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: '#18181b',
@@ -632,52 +524,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 8,
   },
-  categoryChipSelected: {
+  folderChipSelected: {
     backgroundColor: '#27272a',
     borderColor: '#818cf8',
   },
-  categoryChipText: {
+  folderChipText: {
     color: '#a1a1aa',
     fontSize: 12,
   },
-  categoryChipTextSelected: {
+  folderChipTextSelected: {
     color: '#fafafa',
     fontWeight: '600',
-  },
-  tagInputRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  tagTextInput: {
-    flex: 1,
-  },
-  addTagBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#4f46e5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 8,
-  },
-  tagBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#27272a',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  tagBadgeText: {
-    color: '#a5b4fc',
-    fontSize: 11,
-    fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',

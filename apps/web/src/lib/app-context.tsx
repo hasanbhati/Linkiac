@@ -6,7 +6,6 @@ import {
   Category,
   Folder,
   Link,
-  Tag,
   Friendship,
   SendRecipient,
   DomainStat,
@@ -14,6 +13,8 @@ import {
   parseNormalizedDomain,
   ParsedBookmark,
   extractDefaultThumbnail,
+  packSharedComment,
+  unpackSharedComment,
 } from '@linkiac/shared';
 import { defaultCurrentUser } from './constants';
 import { getSupabase } from './supabase/client';
@@ -23,7 +24,6 @@ interface AppContextType {
   links: Link[];
   categories: Category[];
   folders: Folder[];
-  tags: Tag[];
   friends: Friendship[];
   suggestions: SendRecipient[];
   domainStats: DomainStat[];
@@ -37,7 +37,6 @@ interface AppContextType {
     reading_status?: ReadingStatus;
     category_id?: string | null;
     folder_id?: string | null;
-    tags?: string[];
     thumbnail_url?: string | null;
   }) => Promise<Link>;
   updateLink: (id: string, updates: Partial<Link>) => Promise<void>;
@@ -49,10 +48,10 @@ interface AppContextType {
   moveFolder: (folder_id: string, new_parent_folder_id: string | null, new_category_id?: string | null) => Promise<boolean>;
   deleteFolder: (id: string) => Promise<void>;
   bulkMoveLinks: (link_ids: string[], category_id: string | null, folder_id: string | null) => Promise<void>;
-  bulkTagLinks: (link_ids: string[], tag_names: string[]) => Promise<void>;
   bulkDeleteLinks: (link_ids: string[]) => Promise<void>;
   sendLinkToFriends: (data: {
     url: string;
+    title?: string | null;
     comment?: string | null;
     recipient_ids: string[];
     source_link_id?: string | null;
@@ -62,7 +61,8 @@ interface AppContextType {
     suggestion_id: string,
     category_id: string | null,
     folder_id: string | null,
-    customComment?: string | null
+    customComment?: string | null,
+    customTitle?: string | null
   ) => Promise<void>;
   rejectSuggestion: (suggestion_id: string) => Promise<void>;
   acceptFriendRequest: (friendshipId: string) => Promise<void>;
@@ -86,8 +86,8 @@ export function generateUUID(): string {
   });
 }
 
-export function isValidUUID(str: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+export function isValidUUID(str?: string | null): boolean {
+  return Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -95,7 +95,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [links, setLinks] = useState<Link[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [suggestions, setSuggestions] = useState<SendRecipient[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -118,7 +117,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLinks([]);
       setCategories([]);
       setFolders([]);
-      setTags([]);
       setFriends([]);
       setSuggestions([]);
       window.location.href = '/login';
@@ -176,10 +174,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       }
 
-      const [linksRes, catsRes, foldersRes, friendsRes, suggestionsRes, tagsRes] = await Promise.allSettled([
+      const [linksRes, catsRes, foldersRes, friendsRes, suggestionsRes] = await Promise.allSettled([
         supabase
           .from('links')
-          .select('*, link_tags(tag:tags(*))')
+          .select('*')
           .eq('user_id', authUser.id)
           .order('created_at', { ascending: false }),
         supabase
@@ -203,30 +201,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .eq('recipient_id', authUser.id)
           .eq('status', 'pending')
           .order('created_at', { ascending: false }),
-        supabase
-          .from('tags')
-          .select('*')
-          .eq('user_id', authUser.id)
-          .order('name', { ascending: true }),
       ]);
 
       if (linksRes.status === 'fulfilled' && !linksRes.value.error && Array.isArray(linksRes.value.data)) {
-        const transformed: Link[] = linksRes.value.data.map((l: any) => ({
-          id: l.id,
-          user_id: l.user_id || authUser.id,
-          url: l.url,
-          title: l.title || null,
-          comment: l.comment || null,
-          domain: l.domain || parseNormalizedDomain(l.url),
-          reading_status: l.reading_status || 'to_read',
-          thumbnail_url: l.thumbnail_url || null,
-          thumbnail_source: l.thumbnail_source || (l.thumbnail_url ? 'auto' : 'none'),
-          category_id: l.category_id || null,
-          folder_id: l.folder_id || null,
-          tags: l.link_tags?.map((lt: any) => lt.tag).filter(Boolean) || [],
-          created_at: l.created_at,
-          updated_at: l.updated_at || l.created_at,
-        }));
+        const transformed: Link[] = linksRes.value.data.map((l: any) => {
+          const rawTitle = l.title ? String(l.title).trim() : '';
+          const isPollutedTitle = !rawTitle || rawTitle.toLowerCase().startsWith('shared by @');
+          const cleanTitle = isPollutedTitle
+            ? (l.domain || parseNormalizedDomain(l.url) || l.url || 'Saved link')
+            : rawTitle;
+
+          // Auto-heal legacy database rows asynchronously
+          if (isPollutedTitle && l.id && isValidUUID(l.id)) {
+            const supabase = getSupabase();
+            supabase.from('links').update({ title: cleanTitle }).eq('id', l.id).then(() => {});
+          }
+
+          return {
+            id: l.id,
+            user_id: l.user_id || authUser.id,
+            url: l.url,
+            title: cleanTitle,
+            comment: l.comment || null,
+            domain: l.domain || parseNormalizedDomain(l.url),
+            reading_status: l.reading_status || 'to_read',
+            thumbnail_url: l.thumbnail_url || null,
+            thumbnail_source: l.thumbnail_source || (l.thumbnail_url ? 'auto' : 'none'),
+            category_id: l.category_id || null,
+            folder_id: l.folder_id || null,
+            created_at: l.created_at,
+            updated_at: l.updated_at || l.created_at,
+          };
+        });
         setLinks(transformed);
       }
 
@@ -276,20 +282,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const snd = s.send || sendMap.get(s.send_id);
           if (!snd) return s;
           const sender = snd.sender && snd.sender.username ? snd.sender : profileMap.get(snd.sender_id);
+          const { title: unpackedTitle, note: unpackedNote } = unpackSharedComment(snd.comment);
+          const effectiveSendTitle = snd.title || unpackedTitle || snd.source_link?.title || null;
+          const effectiveSendComment = unpackedTitle ? unpackedNote : snd.comment;
+
           return {
             ...s,
             send: {
               ...snd,
+              title: effectiveSendTitle,
+              comment: effectiveSendComment,
               sender: sender || snd.sender || null,
             },
           };
         });
 
         setSuggestions(hydrated);
-      }
-
-      if (tagsRes.status === 'fulfilled' && !tagsRes.value.error && Array.isArray(tagsRes.value.data)) {
-        setTags(tagsRes.value.data);
       }
     } catch (err) {
       console.warn('Linkiac web sync notice:', err);
@@ -317,7 +325,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               if (Array.isArray(parsed.links)) setLinks(parsed.links);
               if (Array.isArray(parsed.categories)) setCategories(parsed.categories);
               if (Array.isArray(parsed.folders)) setFolders(parsed.folders);
-              if (Array.isArray(parsed.tags)) setTags(parsed.tags);
               if (Array.isArray(parsed.friends)) setFriends(parsed.friends);
               if (Array.isArray(parsed.suggestions)) {
                 setSuggestions(
@@ -336,19 +343,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLinks([]);
         setCategories([]);
         setFolders([]);
-        setTags([]);
         setFriends([]);
         setSuggestions([]);
       }
     });
 
-    // Polling sync every 4 seconds for cross-device consistency
+    // Controlled polling: every 20s when tab is visible, sync immediately on tab focus
     const pollInterval = setInterval(() => {
-      syncAllFromSupabase();
-    }, 4000);
+      if (typeof document !== 'undefined' && !document.hidden) {
+        syncAllFromSupabase();
+      }
+    }, 20000);
 
     // Window focus & visibility change sync
-    const handleFocus = () => syncAllFromSupabase();
+    const handleFocus = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        syncAllFromSupabase();
+      }
+    };
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
 
@@ -372,7 +384,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           links,
           categories,
           folders,
-          tags,
           friends,
           suggestions,
         })
@@ -380,7 +391,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Quota exceeded
     }
-  }, [links, categories, folders, tags, friends, suggestions, isLoaded, currentUser.id]);
+  }, [links, categories, folders, friends, suggestions, isLoaded, currentUser.id]);
 
   // Dynamic domain statistics
   const domainStats: DomainStat[] = useMemo(() => {
@@ -404,25 +415,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     reading_status?: ReadingStatus;
     category_id?: string | null;
     folder_id?: string | null;
-    tags?: string[];
     thumbnail_url?: string | null;
   }): Promise<Link> => {
     const domain = parseNormalizedDomain(data.url);
     const now = new Date().toISOString();
     const newId = generateUUID();
 
-    const linkTags: Tag[] = (data.tags || []).map(name => {
-      const existing = tags.find(t => t.name.toLowerCase() === name.toLowerCase());
-      if (existing) return existing;
-      return {
-        id: generateUUID(),
-        user_id: currentUser.id,
-        name: name.trim(),
-        created_at: now,
-      };
-    });
-
     const resolvedThumbnail = data.thumbnail_url?.trim() || extractDefaultThumbnail(data.url) || null;
+
+    let resolvedCategoryId = data.category_id || null;
+    if (data.folder_id && !resolvedCategoryId) {
+      const parent = folders.find(f => f.id === data.folder_id);
+      if (parent?.category_id) resolvedCategoryId = parent.category_id;
+    }
 
     const newLink: Link = {
       id: newId,
@@ -434,9 +439,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reading_status: data.reading_status || 'to_read',
       thumbnail_url: resolvedThumbnail,
       thumbnail_source: resolvedThumbnail ? 'auto' : 'none',
-      category_id: data.category_id || null,
+      category_id: resolvedCategoryId,
       folder_id: data.folder_id || null,
-      tags: linkTags,
       created_at: now,
       updated_at: now,
     };
@@ -448,35 +452,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Push to Supabase
     try {
       const supabase = getSupabase();
-      const { error: linkErr } = await supabase.from('links').insert({
-        id: newId,
-        user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-        url: data.url,
-        title: data.title || null,
-        comment: data.comment || null,
-        domain,
-        reading_status: data.reading_status || 'to_read',
-        thumbnail_url: resolvedThumbnail,
-        thumbnail_source: resolvedThumbnail ? 'auto' : 'none',
-        category_id: data.category_id && isValidUUID(data.category_id) ? data.category_id : null,
-        folder_id: data.folder_id && isValidUUID(data.folder_id) ? data.folder_id : null,
-      });
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+      const effectiveUserId = authUser?.id || (isValidUUID(currentUser.id) ? currentUser.id : null);
 
-      if (linkErr) throw linkErr;
+      if (effectiveUserId) {
+        const { error: linkErr } = await supabase.from('links').insert({
+          id: newId,
+          user_id: effectiveUserId,
+          url: data.url,
+          title: data.title || null,
+          comment: data.comment || null,
+          domain,
+          reading_status: data.reading_status || 'to_read',
+          thumbnail_url: resolvedThumbnail,
+          thumbnail_source: resolvedThumbnail ? 'auto' : 'none',
+          category_id: resolvedCategoryId && isValidUUID(resolvedCategoryId) ? resolvedCategoryId : null,
+          folder_id: data.folder_id && isValidUUID(data.folder_id) ? data.folder_id : null,
+        });
 
-      // Handle tags
-      for (const tag of linkTags) {
-        if (isValidUUID(tag.id)) {
-          await supabase.from('tags').upsert({
-            id: tag.id,
-            user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-            name: tag.name,
-          });
-          await supabase.from('link_tags').upsert({
-            link_id: newId,
-            tag_id: tag.id,
-          });
-        }
+        if (linkErr) throw linkErr;
       }
     } catch (e) {
       console.warn('Supabase addLink error, rolling back:', e);
@@ -490,6 +486,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateLink = async (id: string, updates: Partial<Link>): Promise<void> => {
     const prevLinks = links;
+
     setLinks(prev =>
       prev.map(l => {
         if (l.id !== id) return l;
@@ -507,13 +504,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (isValidUUID(id)) {
       try {
         const supabase = getSupabase();
-        const dbUpdates: any = { ...updates, updated_at: new Date().toISOString() };
-        delete dbUpdates.tags;
-        delete dbUpdates.link_tags;
-        if (dbUpdates.category_id && !isValidUUID(dbUpdates.category_id)) dbUpdates.category_id = null;
-        if (dbUpdates.folder_id && !isValidUUID(dbUpdates.folder_id)) dbUpdates.folder_id = null;
-        const { error } = await supabase.from('links').update(dbUpdates).eq('id', id);
-        if (error) throw error;
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        const effectiveUserId = authUser?.id || (isValidUUID(currentUser.id) ? currentUser.id : null);
+
+        if (effectiveUserId) {
+          const dbUpdates: any = { ...updates, updated_at: new Date().toISOString() };
+          if (dbUpdates.category_id && !isValidUUID(dbUpdates.category_id)) dbUpdates.category_id = null;
+          if (dbUpdates.folder_id && !isValidUUID(dbUpdates.folder_id)) dbUpdates.folder_id = null;
+          const { error } = await supabase.from('links').update(dbUpdates).eq('id', id);
+          if (error) throw error;
+        }
       } catch (e) {
         console.warn('Supabase updateLink error, rolling back:', e);
         setLinks(prevLinks);
@@ -530,7 +532,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (isValidUUID(id)) {
       try {
         const supabase = getSupabase();
-        await supabase.from('link_tags').delete().eq('link_id', id);
         const { error } = await supabase.from('links').delete().eq('id', id);
         if (error) throw error;
       } catch (e) {
@@ -764,10 +765,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const bulkMoveLinks = async (link_ids: string[], category_id: string | null, folder_id: string | null) => {
+    let resolvedCategoryId = category_id || null;
+    if (folder_id && !resolvedCategoryId) {
+      const parent = folders.find(f => f.id === folder_id);
+      if (parent?.category_id) resolvedCategoryId = parent.category_id;
+    }
+
     const prevLinks = links;
     const idSet = new Set(link_ids);
     setLinks(prev =>
-      prev.map(l => (idSet.has(l.id) ? { ...l, category_id, folder_id, updated_at: new Date().toISOString() } : l))
+      prev.map(l => (idSet.has(l.id) ? { ...l, category_id: resolvedCategoryId, folder_id, updated_at: new Date().toISOString() } : l))
     );
 
     try {
@@ -777,7 +784,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase
           .from('links')
           .update({
-            category_id: category_id && isValidUUID(category_id) ? category_id : null,
+            category_id: resolvedCategoryId && isValidUUID(resolvedCategoryId) ? resolvedCategoryId : null,
             folder_id: folder_id && isValidUUID(folder_id) ? folder_id : null,
             updated_at: new Date().toISOString(),
           })
@@ -792,60 +799,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     syncAllFromSupabase();
   };
 
-  const bulkTagLinks = async (link_ids: string[], tag_names: string[]) => {
-    const idSet = new Set(link_ids);
-    const now = new Date().toISOString();
-
-    const createdTags: Tag[] = tag_names.map(name => {
-      const existing = tags.find(t => t.name.toLowerCase() === name.toLowerCase());
-      if (existing) return existing;
-      return {
-        id: generateUUID(),
-        user_id: currentUser.id,
-        name: name.trim(),
-        created_at: now,
-      };
-    });
-
-    setLinks(prev =>
-      prev.map(l => {
-        if (!idSet.has(l.id)) return l;
-        const currentTagNames = new Set((l.tags || []).map(t => t.name.toLowerCase()));
-        const toAdd = createdTags.filter(t => !currentTagNames.has(t.name.toLowerCase()));
-        return {
-          ...l,
-          tags: [...(l.tags || []), ...toAdd],
-          updated_at: now,
-        };
-      })
-    );
-
-    try {
-      const supabase = getSupabase();
-      for (const t of createdTags) {
-        if (isValidUUID(t.id)) {
-          await supabase.from('tags').upsert({
-            id: t.id,
-            user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-            name: t.name,
-          });
-          for (const linkId of link_ids) {
-            if (isValidUUID(linkId)) {
-              await supabase.from('link_tags').upsert({
-                link_id: linkId,
-                tag_id: t.id,
-              });
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Supabase bulkTagLinks notice:', e);
-    }
-
-    syncAllFromSupabase();
-  };
-
   const bulkDeleteLinks = async (link_ids: string[]) => {
     const prevLinks = links;
     const idSet = new Set(link_ids);
@@ -855,7 +808,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const supabase = getSupabase();
       const validLinkIds = link_ids.filter(isValidUUID);
       if (validLinkIds.length > 0) {
-        await supabase.from('link_tags').delete().in('link_id', validLinkIds);
         const { error } = await supabase.from('links').delete().in('id', validLinkIds);
         if (error) throw error;
       }
@@ -869,75 +821,137 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const sendLinkToFriends = async (data: {
     url: string;
+    title?: string | null;
     comment?: string | null;
     recipient_ids: string[];
     source_link_id?: string | null;
     thumbnail_url?: string | null;
   }) => {
-    const sendId = generateUUID();
-    const now = new Date().toISOString();
+    const validRecipientIds = (data.recipient_ids || []).filter(isValidUUID);
+    const trimmedUrl = data.url ? data.url.trim() : '';
 
-    const newSuggestions: SendRecipient[] = data.recipient_ids.map(recipientId => ({
-      id: generateUUID(),
-      send_id: sendId,
-      recipient_id: recipientId,
-      status: 'pending',
-      reading_status: 'to_read',
-      resulting_link_id: null,
-      created_at: now,
-      decided_at: null,
-      send: {
-        id: sendId,
-        sender_id: currentUser.id,
-        url: data.url,
-        comment: data.comment || null,
-        thumbnail_url: data.thumbnail_url || null,
-        source_link_id: data.source_link_id || null,
-        created_at: now,
-        sender: currentUser,
-      },
-    }));
+    if (!trimmedUrl) {
+      throw new Error('URL is required to share.');
+    }
+    if (validRecipientIds.length === 0) {
+      throw new Error('Please select at least one valid friend to send to.');
+    }
 
-    // NOTE: Do NOT add newSuggestions to the sender's own inbox suggestions state.
-    // The recipient will receive this suggestion in their own inbox.
+    const supabase = getSupabase();
+    // Resolve authenticated user ID
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const effectiveUserId = authUser?.id || (isValidUUID(currentUser.id) ? currentUser.id : null);
+    if (!effectiveUserId) {
+      throw new Error('You must be signed in to send link recommendations.');
+    }
 
+    const comment = data.comment?.trim() || null;
+    const sourceLinkId = data.source_link_id && isValidUUID(data.source_link_id) ? data.source_link_id : null;
+    const thumbnailUrl = data.thumbnail_url || null;
+    const title = data.title?.trim() || null;
+    const packedComment = packSharedComment(title, comment);
+
+    let sendSuccess = false;
+
+    // TIER 1: Attempt atomic RPC with 6 parameters (including p_title)
     try {
-      const supabase = getSupabase();
-      const validRecipientIds = data.recipient_ids.filter(isValidUUID);
-      if (isValidUUID(currentUser.id) && validRecipientIds.length > 0) {
-        // Attempt atomic database transaction RPC
-        const { error: rpcErr } = await supabase.rpc('send_link_to_recipients', {
-          p_url: data.url,
-          p_comment: data.comment || null,
-          p_recipient_ids: validRecipientIds,
-          p_source_link_id: data.source_link_id && isValidUUID(data.source_link_id) ? data.source_link_id : null,
-          p_thumbnail_url: data.thumbnail_url || null,
-        });
+      const { error: rpc6Err } = await supabase.rpc('send_link_to_recipients', {
+        p_url: trimmedUrl,
+        p_comment: packedComment,
+        p_recipient_ids: validRecipientIds,
+        p_source_link_id: sourceLinkId,
+        p_thumbnail_url: thumbnailUrl,
+        p_title: title,
+      });
 
-        if (rpcErr) {
-          console.warn('send_link_to_recipients RPC error, using fallback:', rpcErr);
-          await supabase.from('sends').insert({
-            id: sendId,
-            sender_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-            url: data.url,
-            comment: data.comment || null,
-            thumbnail_url: data.thumbnail_url || null,
-            source_link_id: data.source_link_id && isValidUUID(data.source_link_id) ? data.source_link_id : null,
+      if (!rpc6Err) {
+        sendSuccess = true;
+      } else {
+        const isSignatureMismatch =
+          rpc6Err.code === 'PGRST202' ||
+          rpc6Err.message?.toLowerCase().includes('schema cache') ||
+          rpc6Err.message?.toLowerCase().includes('could not find the function');
+
+        if (isSignatureMismatch) {
+          // TIER 2: Fallback to existing 5-parameter RPC signature in production database
+          const { data: rpc5SendId, error: rpc5Err } = await supabase.rpc('send_link_to_recipients', {
+            p_url: trimmedUrl,
+            p_comment: packedComment,
+            p_recipient_ids: validRecipientIds,
+            p_source_link_id: sourceLinkId,
+            p_thumbnail_url: thumbnailUrl,
           });
 
-          for (const rec of newSuggestions) {
-            await supabase.from('send_recipients').insert({
-              id: rec.id,
-              send_id: sendId,
-              recipient_id: rec.recipient_id,
-              status: 'pending',
-              reading_status: 'to_read',
-            });
+          if (!rpc5Err) {
+            sendSuccess = true;
+            if (rpc5SendId && title) {
+              supabase.from('sends').update({ title }).eq('id', rpc5SendId).then(() => {});
+            }
+          } else {
+            console.warn('5-param send_link_to_recipients RPC failed:', rpc5Err);
           }
+        } else {
+          console.warn('6-param send_link_to_recipients RPC failed:', rpc6Err);
         }
       }
-    } catch (e) {
-      console.warn('Supabase sendLinkToFriends notice:', e);
+    } catch (rpcEx) {
+      console.warn('RPC execution exception, attempting direct fallback:', rpcEx);
+    }
+
+    // TIER 3: Direct table insert fallback
+    if (!sendSuccess) {
+      const sendId = generateUUID();
+      const baseSendPayload = {
+        id: sendId,
+        sender_id: effectiveUserId,
+        url: trimmedUrl,
+        comment: packedComment,
+        thumbnail_url: thumbnailUrl,
+        source_link_id: sourceLinkId,
+      };
+
+      let insertErr: any = null;
+      if (title) {
+        const { error } = await supabase.from('sends').insert({
+          ...baseSendPayload,
+          title: title,
+        });
+        insertErr = error;
+      } else {
+        const { error } = await supabase.from('sends').insert(baseSendPayload);
+        insertErr = error;
+      }
+
+      // If failed due to missing sends.title column (code 42703), retry without title
+      if (insertErr && (insertErr.code === '42703' || insertErr.message?.toLowerCase().includes('title'))) {
+        const { error: retryErr } = await supabase.from('sends').insert(baseSendPayload);
+        insertErr = retryErr;
+      }
+
+      if (insertErr) {
+        console.error('Direct send master insert failed:', insertErr);
+        throw new Error(insertErr.message || 'Failed to create recommendation master record.');
+      }
+
+      const recipientRows = validRecipientIds
+        .filter(rid => rid !== effectiveUserId)
+        .map(recipientId => ({
+          id: generateUUID(),
+          send_id: sendId,
+          recipient_id: recipientId,
+          status: 'pending',
+          reading_status: 'to_read',
+        }));
+
+      if (recipientRows.length > 0) {
+        const { error: recErr } = await supabase.from('send_recipients').insert(recipientRows);
+        if (recErr) {
+          console.error('Direct send_recipients insert failed:', recErr);
+          throw new Error(recErr.message || 'Failed to deliver recommendations to selected friends.');
+        }
+      }
+
+      sendSuccess = true;
     }
 
     syncAllFromSupabase();
@@ -947,7 +961,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     suggestion_id: string,
     category_id: string | null,
     folder_id: string | null,
-    customComment?: string | null
+    customComment?: string | null,
+    customTitle?: string | null
   ) => {
     const item = suggestions.find(s => s.id === suggestion_id);
     if (!item || !item.send) return;
@@ -955,19 +970,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const newLinkId = generateUUID();
     const now = new Date().toISOString();
 
+    const { title: unpackedTitle, note: unpackedNote } = unpackSharedComment(item.send.comment);
+    const rawSendTitle = item.send.title ? String(item.send.title).trim() : '';
+    const rawSourceTitle = item.send.source_link?.title ? String(item.send.source_link.title).trim() : '';
+    const userTitle = customTitle ? String(customTitle).trim() : '';
+    let effectiveTitle = userTitle || rawSendTitle || unpackedTitle || rawSourceTitle;
+
+    // Never allow 'Shared by @...' to become the link title
+    if (!effectiveTitle || effectiveTitle.toLowerCase().startsWith('shared by @')) {
+      effectiveTitle = parseNormalizedDomain(item.send.url) || item.send.url || 'Saved link';
+    }
+
+    let resolvedCategoryId = category_id || null;
+    if (folder_id && !resolvedCategoryId) {
+      const parent = folders.find(f => f.id === folder_id);
+      if (parent?.category_id) resolvedCategoryId = parent.category_id;
+    }
+
     const createdLink: Link = {
       id: newLinkId,
       user_id: currentUser.id,
       url: item.send.url,
-      title: item.send.sender ? `Shared by @${item.send.sender.username}` : 'Suggested link',
-      comment: customComment !== undefined ? customComment : item.send.comment,
+      title: effectiveTitle,
+      comment: customComment !== undefined ? customComment : (unpackedTitle ? unpackedNote : item.send.comment),
       domain: parseNormalizedDomain(item.send.url),
       reading_status: item.reading_status,
       thumbnail_url: item.send.thumbnail_url,
       thumbnail_source: item.send.thumbnail_url ? 'auto' : 'none',
-      category_id: category_id || null,
+      category_id: resolvedCategoryId,
       folder_id: folder_id || null,
-      tags: [],
       created_at: now,
       updated_at: now,
     };
@@ -978,30 +1009,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const supabase = getSupabase();
       if (isValidUUID(currentUser.id) && isValidUUID(suggestion_id)) {
-        // Attempt atomic database transaction RPC
-        const { error: rpcErr } = await supabase.rpc('accept_friend_suggestion', {
-          p_suggestion_id: suggestion_id,
-          p_category_id: category_id && isValidUUID(category_id) ? category_id : null,
-          p_folder_id: folder_id && isValidUUID(folder_id) ? folder_id : null,
-          p_custom_comment: customComment !== undefined ? customComment : null,
+        // Persist to Supabase: direct insert first with correct title, update suggestion status
+        const { error: insertErr } = await supabase.from('links').insert({
+          id: newLinkId,
+          user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
+          url: item.send.url,
+          title: effectiveTitle,
+          comment: createdLink.comment,
+          domain: createdLink.domain,
+          reading_status: item.reading_status || 'to_read',
+          thumbnail_url: item.send.thumbnail_url,
+          thumbnail_source: item.send.thumbnail_url ? 'auto' : 'none',
+          category_id: resolvedCategoryId && isValidUUID(resolvedCategoryId) ? resolvedCategoryId : null,
+          folder_id: folder_id && isValidUUID(folder_id) ? folder_id : null,
         });
 
-        if (rpcErr) {
-          console.warn('accept_friend_suggestion RPC error, using fallback:', rpcErr);
-          await supabase.from('links').insert({
-            id: newLinkId,
-            user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-            url: item.send.url,
-            title: createdLink.title,
-            comment: createdLink.comment,
-            domain: createdLink.domain,
-            reading_status: item.reading_status || 'to_read',
-            thumbnail_url: item.send.thumbnail_url,
-            thumbnail_source: item.send.thumbnail_url ? 'auto' : 'none',
-            category_id: category_id && isValidUUID(category_id) ? category_id : null,
-            folder_id: folder_id && isValidUUID(folder_id) ? folder_id : null,
-          });
-
+        if (!insertErr) {
           await supabase
             .from('send_recipients')
             .update({
@@ -1010,6 +1033,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               decided_at: now,
             })
             .eq('id', suggestion_id);
+        } else {
+          console.warn('Direct link insert notice, attempting RPC fallback:', insertErr);
+          const { data: rpcLinkId, error: rpcErr } = await supabase.rpc('accept_friend_suggestion', {
+            p_suggestion_id: suggestion_id,
+            p_category_id: category_id && isValidUUID(category_id) ? category_id : null,
+            p_folder_id: folder_id && isValidUUID(folder_id) ? folder_id : null,
+            p_custom_comment: customComment !== undefined ? customComment : null,
+          });
+
+          // Enforce clean title if legacy RPC set it to 'Shared by @...'
+          if (!rpcErr && rpcLinkId) {
+            await supabase.from('links').update({ title: effectiveTitle }).eq('id', rpcLinkId);
+          }
         }
       }
     } catch (e) {
@@ -1130,7 +1166,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         thumbnail_source: 'none',
         category_id: null,
         folder_id: folderId,
-        tags: [],
         created_at: now,
         updated_at: now,
       };
@@ -1199,7 +1234,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         links,
         categories,
         folders,
-        tags,
         friends,
         suggestions,
         domainStats,
@@ -1215,7 +1249,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         moveFolder,
         deleteFolder,
         bulkMoveLinks,
-        bulkTagLinks,
         bulkDeleteLinks,
         sendLinkToFriends,
         acceptSuggestion,

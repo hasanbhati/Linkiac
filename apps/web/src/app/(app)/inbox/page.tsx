@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SendRecipient, ReadingStatus, isSafeWebUrl, ensureUrlProtocol } from '@linkiac/shared';
+import { SendRecipient, ReadingStatus, isSafeWebUrl, ensureUrlProtocol, unpackSharedComment } from '@linkiac/shared';
 import { Navbar } from '@/components/Navbar';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -29,17 +29,15 @@ export default function InboxPage() {
   );
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto pb-24 md:pb-8">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
         <Sidebar
-          selectedCategoryId={null}
           selectedFolderId={null}
           isUnfiledOnly={false}
           onSelectAll={() => {}}
           onSelectUnfiled={() => {}}
-          onSelectCategory={() => {}}
           onSelectFolder={() => {}}
         />
 
@@ -49,7 +47,7 @@ export default function InboxPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100 flex items-center gap-2.5">
                 <Inbox size={22} className="text-indigo-400" />
-                <span>Suggestions Inbox</span>
+                <span>Inbox</span>
               </h1>
               <span className="text-xs font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-full">
                 {pendingSuggestions.length}
@@ -80,6 +78,14 @@ export default function InboxPage() {
                 const isSafe = isSafeWebUrl(send.url);
                 const clickableUrl = isSafe ? ensureUrlProtocol(send.url) : null;
                 const sender = send.sender;
+                const { title: unpackedTitle, note: unpackedNote } = unpackSharedComment(send.comment);
+                const rawSendTitle = send.title ? String(send.title).trim() : '';
+                const rawSourceTitle = send.source_link?.title ? String(send.source_link.title).trim() : '';
+                let itemTitle = rawSendTitle || unpackedTitle || rawSourceTitle;
+                if (itemTitle.toLowerCase().startsWith('shared by @')) {
+                  itemTitle = '';
+                }
+                const displayComment = unpackedTitle ? unpackedNote : send.comment;
 
                 return (
                   <div
@@ -113,27 +119,32 @@ export default function InboxPage() {
                       </div>
 
                       {/* URL / Text */}
+                      {itemTitle && (
+                        <h3 className="text-sm font-semibold text-zinc-100 mb-1 line-clamp-2">
+                          {itemTitle}
+                        </h3>
+                      )}
                       {isSafe && clickableUrl ? (
                         <a
                           href={clickableUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm font-semibold text-zinc-100 hover:text-indigo-400 flex items-center gap-1.5 line-clamp-2 transition-colors mb-2"
+                          className={`text-xs ${itemTitle ? 'text-indigo-400 hover:text-indigo-300 font-mono' : 'text-sm font-semibold text-zinc-100 hover:text-indigo-400'} flex items-center gap-1.5 line-clamp-1 transition-colors mb-2`}
                         >
-                          <span className="truncate">{send.url}</span>
-                          <ExternalLink size={13} className="flex-shrink-0" />
+                          <span className="truncate font-mono">{send.url}</span>
+                          <ExternalLink size={12} className="flex-shrink-0" />
                         </a>
                       ) : (
-                        <p className="text-sm font-semibold text-zinc-100 line-clamp-2 mb-2 select-text font-mono">
+                        <p className={`text-xs ${itemTitle ? 'text-zinc-400 font-mono' : 'text-sm font-semibold text-zinc-100 font-mono'} line-clamp-1 mb-2 select-text`}>
                           {send.url}
                         </p>
                       )}
 
                       {/* Sender Note */}
-                      {send.comment && (
+                      {displayComment && (
                         <div className="p-3 bg-zinc-950/70 rounded-xl border border-zinc-800/80 text-xs text-zinc-300 italic flex items-start gap-2">
                           <MessageSquare size={13} className="text-indigo-400 mt-0.5 flex-shrink-0" />
-                          <span>&quot;{send.comment}&quot;</span>
+                          <span>&quot;{displayComment}&quot;</span>
                         </div>
                       )}
                     </div>

@@ -18,17 +18,15 @@ export default function DashboardPage() {
   const maxCount = domainStats.length > 0 ? domainStats[0].count : 1;
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto pb-24 md:pb-8">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
         <Sidebar
-          selectedCategoryId={null}
           selectedFolderId={null}
           isUnfiledOnly={false}
           onSelectAll={() => {}}
           onSelectUnfiled={() => {}}
-          onSelectCategory={() => {}}
           onSelectFolder={() => {}}
         />
 

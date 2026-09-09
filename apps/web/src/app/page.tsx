@@ -76,7 +76,7 @@ export default function HomePage() {
             </div>
             <h3 className="font-semibold text-zinc-100 text-base">Infinite Organization</h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Categories, deeply nested folders, private tags, and reading statuses. Drag-and-drop or use accessible
+              Deeply nested folders, categories, and reading statuses. Drag-and-drop or use accessible
               move menus on touch screens.
             </p>
           </div>

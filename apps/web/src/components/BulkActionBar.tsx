@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FolderInput, Tag as TagIcon, Trash2, X, CheckSquare } from 'lucide-react';
+import { FolderInput, Trash2, X, CheckSquare } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { CustomSelect, SelectOption } from './CustomSelect';
 
@@ -11,12 +11,10 @@ interface BulkActionBarProps {
 }
 
 export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarProps) {
-  const { categories, folders, bulkMoveLinks, bulkTagLinks, bulkDeleteLinks } = useApp();
+  const { categories, folders, bulkMoveLinks, bulkDeleteLinks } = useApp();
 
   const [showMoveDialog, setShowMoveDialog] = useState(false);
-  const [showTagDialog, setShowTagDialog] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [tagInput, setTagInput] = useState('');
 
   if (selectedIds.length === 0) return null;
 
@@ -29,18 +27,6 @@ export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarPr
     bulkMoveLinks(selectedIds, resolvedCategoryId, selectedFolderId);
     setShowMoveDialog(false);
     onClearSelection();
-  };
-
-  const handleBulkTag = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tagInput.trim()) return;
-    const tags = tagInput.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean);
-    if (tags.length > 0) {
-      bulkTagLinks(selectedIds, tags);
-      setShowTagDialog(false);
-      setTagInput('');
-      onClearSelection();
-    }
   };
 
   const handleBulkDelete = () => {
@@ -76,15 +62,6 @@ export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarPr
           >
             <FolderInput size={14} className="text-amber-400" />
             <span>Move</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowTagDialog(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium transition-colors"
-          >
-            <TagIcon size={14} className="text-indigo-400" />
-            <span>Add Tags</span>
           </button>
 
           <button
@@ -134,39 +111,6 @@ export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarPr
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Bulk Tag Dialog */}
-      {showTagDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <form onSubmit={handleBulkTag} className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
-            <h3 className="font-semibold text-zinc-100 text-sm">Tag {selectedIds.length} links</h3>
-            <input
-              type="text"
-              placeholder="e.g. project-x, research, priority"
-              value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              autoFocus
-            />
-            <p className="text-[11px] text-zinc-500">Separate multiple tags with commas.</p>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowTagDialog(false)}
-                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-xs"
-              >
-                Apply Tags
-              </button>
-            </div>
-          </form>
         </div>
       )}
     </>

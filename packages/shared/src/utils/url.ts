@@ -181,3 +181,39 @@ export function extractDefaultThumbnail(rawUrl: string): string | null {
   return null;
 }
 
+/**
+ * Safely packs an optional title and personal note into a recommendation comment payload.
+ * Guarantees cross-client title transport even when the live database table lacks a `title` column.
+ */
+export function packSharedComment(title?: string | null, note?: string | null): string | null {
+  const cleanTitle = title?.trim() || null;
+  const cleanNote = note?.trim() || null;
+
+  if (!cleanTitle && !cleanNote) return null;
+  if (!cleanTitle) return cleanNote;
+
+  if (!cleanNote) {
+    return `[Title: ${cleanTitle}]`;
+  }
+  return `[Title: ${cleanTitle}]\n${cleanNote}`;
+}
+
+/**
+ * Unpacks any embedded title from a recommendation comment.
+ * Returns the extracted title and cleaned personal note.
+ */
+export function unpackSharedComment(rawComment?: string | null): { title: string | null; note: string | null } {
+  if (!rawComment) return { title: null, note: null };
+  const trimmed = rawComment.trim();
+
+  // Match [Title: <title>] followed by optional whitespace or newlines and remainder note
+  const match = trimmed.match(/^\[Title:\s*([^\]]+)\](?:\r?\n|\s+)?([\s\S]*)$/i);
+  if (match) {
+    const extractedTitle = match[1].trim() || null;
+    const extractedNote = match[2].trim() || null;
+    return { title: extractedTitle, note: extractedNote };
+  }
+
+  return { title: null, note: trimmed || null };
+}
+

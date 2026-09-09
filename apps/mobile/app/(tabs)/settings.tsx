@@ -62,6 +62,7 @@ export default function MobileSettingsScreen() {
   const [isSavingEmail, setIsSavingEmail] = useState(false);
 
   // Change Password form state
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
@@ -178,6 +179,11 @@ export default function MobileSettingsScreen() {
   };
 
   const handleUpdatePassword = async () => {
+    if (!currentPassword) {
+      Alert.alert('Current Password Required', 'Please enter your current password to continue.');
+      return;
+    }
+
     if (newPassword.length < 8) {
       Alert.alert('Invalid Password', 'New password must be at least 8 characters long.');
       return;
@@ -190,10 +196,26 @@ export default function MobileSettingsScreen() {
 
     setIsSavingPassword(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        throw new Error('Unable to identify authenticated user.');
+      }
+
+      // Re-authenticate with current password to prevent unauthorized takeover
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+
+      if (signInErr) {
+        throw new Error('Current password is incorrect. Please check and try again.');
+      }
+
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
       setIsChangePasswordOpen(false);
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       Alert.alert('Success', 'Your password has been changed successfully!');
@@ -693,6 +715,18 @@ export default function MobileSettingsScreen() {
             </View>
 
             <View style={styles.modalBody}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor="#52525b"
+                  secureTextEntry
+                />
+              </View>
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>NEW PASSWORD (MIN 8 CHARACTERS)</Text>
                 <TextInput

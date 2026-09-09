@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link as LinkType, ReadingStatus, extractDefaultThumbnail } from '@linkiac/shared';
-import { X, Sparkles, Upload, Loader2, Bookmark, Folder, Tag as TagIcon, Image as ImageIcon, Trash2, Camera } from 'lucide-react';
+import { X, Sparkles, Upload, Loader2, Bookmark, Folder, Image as ImageIcon, Trash2, Camera } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { getSupabase } from '@/lib/supabase/client';
 import { CustomSelect, SelectOption } from './CustomSelect';
@@ -14,16 +14,13 @@ interface SaveLinkModalProps {
 }
 
 export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps) {
-  const { currentUser, categories, folders, addLink, updateLink } = useApp();
+  const { currentUser, folders, addLink, updateLink } = useApp();
 
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
   const [readingStatus, setReadingStatus] = useState<ReadingStatus>('to_read');
-  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [folderId, setFolderId] = useState<string | null>(null);
-  const [tagInput, setTagInput] = useState('');
-  const [tagsList, setTagsList] = useState<string[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isFetchingPreview, setIsFetchingPreview] = useState(false);
   const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
@@ -37,18 +34,14 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
       setTitle(editLink.title || '');
       setComment(editLink.comment || '');
       setReadingStatus(editLink.reading_status);
-      setCategoryId(editLink.category_id);
       setFolderId(editLink.folder_id);
-      setTagsList((editLink.tags || []).map(t => t.name));
       setThumbnailUrl(editLink.thumbnail_url);
     } else {
       setUrl('');
       setTitle('');
       setComment('');
       setReadingStatus('to_read');
-      setCategoryId(null);
       setFolderId(null);
-      setTagsList([]);
       setThumbnailUrl(null);
       setError(null);
     }
@@ -158,21 +151,6 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
     }
   };
 
-  const handleAddTag = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      const val = tagInput.trim().replace(/^#/, '');
-      if (val && !tagsList.includes(val)) {
-        setTagsList([...tagsList, val]);
-        setTagInput('');
-      }
-    }
-  };
-
-  const handleRemoveTag = (tagName: string) => {
-    setTagsList(tagsList.filter(t => t !== tagName));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
@@ -187,7 +165,7 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
           title: title.trim() || null,
           comment: comment.trim() || null,
           reading_status: readingStatus,
-          category_id: categoryId,
+          category_id: null,
           folder_id: folderId,
           thumbnail_url: thumbnailUrl,
         });
@@ -197,9 +175,8 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
           title: title.trim() || null,
           comment: comment.trim() || null,
           reading_status: readingStatus,
-          category_id: categoryId,
+          category_id: null,
           folder_id: folderId,
-          tags: tagsList,
           thumbnail_url: thumbnailUrl,
         });
       }
@@ -213,23 +190,10 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
   // Folder options for CustomSelect
   const folderOptions: SelectOption[] = [
     { value: 'none', label: 'No folder (Unfiled)' },
-    ...folders.map(f => {
-      const cat = categories.find(c => c.id === f.category_id);
-      return {
-        value: f.id,
-        label: f.name,
-        badge: cat ? cat.name : 'Standalone',
-        icon: <Folder size={14} className="text-amber-400" />,
-      };
-    }),
-  ];
-
-  // Category options
-  const categoryOptions: SelectOption[] = [
-    { value: 'none', label: 'No category' },
-    ...categories.map(c => ({
-      value: c.id,
-      label: c.name,
+    ...folders.map(f => ({
+      value: f.id,
+      label: f.name,
+      icon: <Folder size={14} className="text-amber-400" />,
     })),
   ];
 
@@ -338,48 +302,6 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
               onChange={val => setFolderId(val === 'none' ? null : val)}
               options={folderOptions}
               placeholder="Select folder"
-            />
-          </div>
-
-          {/* Category */}
-          <CustomSelect
-            label="Category"
-            value={categoryId || 'none'}
-            onChange={val => setCategoryId(val === 'none' ? null : val)}
-            options={categoryOptions}
-            placeholder="Assign to top-level category"
-          />
-
-          {/* Tags */}
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
-              Tags (press Enter to add)
-            </label>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {tagsList.map(tag => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-zinc-800 text-zinc-200 border border-zinc-700"
-                >
-                  <TagIcon size={11} className="text-zinc-400" />
-                  <span>{tag}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveTag(tag)}
-                    className="hover:text-red-400 ml-0.5"
-                  >
-                    <X size={12} />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <input
-              type="text"
-              placeholder="e.g. frontend, inspiration, reading..."
-              value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              onKeyDown={handleAddTag}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 

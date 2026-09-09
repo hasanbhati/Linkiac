@@ -10,9 +10,10 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bookmark, Mail, Lock, AtSign, ArrowRight } from 'lucide-react-native';
+import { Bookmark, Mail, Lock, AtSign, ArrowRight, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 
@@ -25,6 +26,33 @@ export default function MobileLoginScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Forgot password state
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [isSendingReset, setIsSendingReset] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!resetEmail.trim() || !resetEmail.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+    setIsSendingReset(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim());
+      if (error) throw error;
+      Alert.alert(
+        'Reset Link Sent',
+        `A password reset link has been sent to ${resetEmail.trim()}. Please check your email inbox.`
+      );
+      setIsForgotPasswordOpen(false);
+      setResetEmail('');
+    } catch (err: any) {
+      Alert.alert('Reset Failed', err.message || 'Failed to send password reset email.');
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
 
   const handleSubmit = async () => {
     setErrorMsg(null);
@@ -53,6 +81,19 @@ export default function MobileLoginScreen() {
         const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
         if (cleanUsername.length < 3) {
           setErrorMsg('Username must be at least 3 characters (letters, numbers, underscores).');
+          setIsLoading(false);
+          return;
+        }
+
+        // Proactively check if username is already taken to prevent silent suffixing (BUG-02)
+        const { data: existingUser } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('username', cleanUsername)
+          .maybeSingle();
+
+        if (existingUser) {
+          setErrorMsg(`Username @${cleanUsername} is already taken. Please choose another.`);
           setIsLoading(false);
           return;
         }
@@ -88,11 +129,23 @@ export default function MobileLoginScreen() {
 
         // If user entered a username without @, resolve to email via RPC
         if (!cleanIdentifier.includes('@')) {
-          const { data: resolvedEmail, error: rpcErr } = await supabase.rpc('get_email_by_username', {
+          let resolvedEmail: string | null = null;
+          const { data: secureEmail, error: secureErr } = await supabase.rpc('get_email_by_username', {
             p_username: cleanIdentifier,
+            p_password: password,
           });
 
-          if (rpcErr || !resolvedEmail) {
+          if (!secureErr && secureEmail) {
+            resolvedEmail = secureEmail;
+          } else if (secureErr?.code === 'PGRST202' || secureErr?.message?.includes('schema cache')) {
+            // Fallback to legacy 1-param signature if migration has not run yet
+            const { data: legacyEmail } = await supabase.rpc('get_email_by_username', {
+              p_username: cleanIdentifier,
+            });
+            resolvedEmail = legacyEmail;
+          }
+
+          if (!resolvedEmail) {
             setErrorMsg('Invalid username or password.');
             setIsLoading(false);
             return;
@@ -205,6 +258,16 @@ export default function MobileLoginScreen() {
               </View>
             </View>
 
+            {!isSignUp && (
+              <TouchableOpacity
+                style={styles.forgotPasswordWrap}
+                onPress={() => setIsForgotPasswordOpen(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={[styles.button, isLoading && styles.buttonDisabled]}
               onPress={handleSubmit}
@@ -242,6 +305,65 @@ export default function MobileLoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Forgot Password Modal (GAP-07) */}
+      <Modal
+        visible={isForgotPasswordOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsForgotPasswordOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reset Password</Text>
+              <TouchableOpacity
+                onPress={() => setIsForgotPasswordOpen(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X color="#a1a1aa" size={20} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalDesc}>
+              Enter your registered email address to receive a secure link to reset your password.
+            </Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>EMAIL ADDRESS</Text>
+              <View style={styles.inputContainer}>
+                <Mail color="#71717a" size={18} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="you@example.com"
+                  placeholderTextColor="#52525b"
+                  value={resetEmail}
+                  onChangeText={setResetEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoCorrect={false}
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, isSendingReset && styles.buttonDisabled]}
+              onPress={handleForgotPassword}
+              disabled={isSendingReset}
+              activeOpacity={0.8}
+            >
+              {isSendingReset ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.buttonText}>Send Password Reset Link</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -378,5 +500,46 @@ const styles = StyleSheet.create({
     color: '#818cf8',
     fontSize: 13,
     fontWeight: '600',
+  },
+  forgotPasswordWrap: {
+    alignSelf: 'flex-end',
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  forgotPasswordText: {
+    color: '#818cf8',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#18181b',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    color: '#fafafa',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalDesc: {
+    color: '#a1a1aa',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 20,
   },
 });

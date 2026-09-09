@@ -1,4 +1,5 @@
 import { Link, Folder, Category } from '../types';
+import { isSafeWebUrl, ensureUrlProtocol } from '../utils/url';
 
 export interface ExportData {
   links: Link[];
@@ -75,7 +76,8 @@ export function generateNetscapeBookmarks(data: ExportData): string {
       // Render links in this folder
       for (const link of folderLinks) {
         const title = escapeHtml(link.title || link.url);
-        const url = escapeHtml(link.url);
+        const safeUrl = isSafeWebUrl(link.url) ? ensureUrlProtocol(link.url) : '#';
+        const url = escapeHtml(safeUrl);
         const addDate = Math.floor(new Date(link.created_at).getTime() / 1000) || nowUnix;
         out += `${indent}  <DT><A HREF="${url}" ADD_DATE="${addDate}">${title}</A>\n`;
       }
@@ -108,7 +110,8 @@ export function generateNetscapeBookmarks(data: ExportData): string {
     html += `  <DL><p>\n`;
     for (const link of catLinks) {
       const title = escapeHtml(link.title || link.url);
-      const url = escapeHtml(link.url);
+      const safeUrl = isSafeWebUrl(link.url) ? ensureUrlProtocol(link.url) : '#';
+      const url = escapeHtml(safeUrl);
       const addDate = Math.floor(new Date(link.created_at).getTime() / 1000) || nowUnix;
       html += `    <DT><A HREF="${url}" ADD_DATE="${addDate}">${title}</A>\n`;
     }
@@ -125,7 +128,8 @@ export function generateNetscapeBookmarks(data: ExportData): string {
     html += `  <DL><p>\n`;
     for (const link of unfiledStandalone) {
       const title = escapeHtml(link.title || link.url);
-      const url = escapeHtml(link.url);
+      const safeUrl = isSafeWebUrl(link.url) ? ensureUrlProtocol(link.url) : '#';
+      const url = escapeHtml(safeUrl);
       const addDate = Math.floor(new Date(link.created_at).getTime() / 1000) || nowUnix;
       html += `    <DT><A HREF="${url}" ADD_DATE="${addDate}">${title}</A>\n`;
     }

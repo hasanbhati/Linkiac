@@ -32,11 +32,23 @@ function LoginForm() {
 
       // If user provided a username without @, resolve to email via RPC
       if (!cleanIdentifier.includes('@')) {
-        const { data: resolvedEmail, error: rpcErr } = await supabase.rpc('get_email_by_username', {
+        let resolvedEmail: string | null = null;
+        const { data: secureEmail, error: secureErr } = await supabase.rpc('get_email_by_username', {
           p_username: cleanIdentifier,
+          p_password: password,
         });
 
-        if (rpcErr || !resolvedEmail) {
+        if (!secureErr && secureEmail) {
+          resolvedEmail = secureEmail;
+        } else if (secureErr?.code === 'PGRST202' || secureErr?.message?.includes('schema cache')) {
+          // Fallback to legacy 1-param signature if migration has not run yet
+          const { data: legacyEmail } = await supabase.rpc('get_email_by_username', {
+            p_username: cleanIdentifier,
+          });
+          resolvedEmail = legacyEmail;
+        }
+
+        if (!resolvedEmail) {
           setErrorMsg('Invalid username or password.');
           setIsLoading(false);
           return;

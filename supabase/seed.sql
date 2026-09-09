@@ -76,14 +76,6 @@ values
   ('20000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', null, null, 'Standalone Reading List', now() - interval '18 days')
 on conflict (id) do nothing;
 
--- Tags for Admin
-insert into tags (id, user_id, name, created_at)
-values 
-  ('30000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'frontend', now() - interval '24 days'),
-  ('30000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'security', now() - interval '22 days'),
-  ('30000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'inspiration', now() - interval '19 days')
-on conflict (id) do nothing;
-
 -- Links for Admin (Exercising standard URLs, media, unconstrained free text)
 insert into links (id, user_id, url, title, comment, domain, reading_status, thumbnail_url, thumbnail_source, category_id, folder_id, created_at, updated_at)
 values
@@ -148,14 +140,6 @@ values
     now() - interval '2 days'
   )
 on conflict (id) do nothing;
-
--- Link-Tag Associations
-insert into link_tags (link_id, tag_id)
-values
-  ('40000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001'),
-  ('40000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000001'),
-  ('40000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000003')
-on conflict (link_id, tag_id) do nothing;
 
 -- Send from Alex to Hasan (Incoming Suggestion in Hasan's Inbox)
 insert into sends (id, sender_id, url, comment, thumbnail_url, source_link_id, created_at)

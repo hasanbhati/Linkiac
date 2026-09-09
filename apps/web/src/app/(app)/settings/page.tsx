@@ -46,6 +46,7 @@ export default function SettingsPage() {
   const [emailError, setEmailError] = useState<string | null>(null);
 
   // Password form
+  const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [passSaved, setPassSaved] = useState(false);
@@ -200,6 +201,11 @@ export default function SettingsPage() {
     setPassError(null);
     setPassSaved(false);
 
+    if (!currentPass) {
+      setPassError('Please enter your current password.');
+      return;
+    }
+
     if (newPass.length < 8) {
       setPassError('Password must be at least 8 characters long');
       return;
@@ -213,11 +219,29 @@ export default function SettingsPage() {
 
     try {
       const supabase = getSupabase();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        setPassError('Unable to identify authenticated user.');
+        return;
+      }
+
+      // Re-authenticate with current password to prevent unauthorized password takeovers
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPass,
+      });
+
+      if (signInErr) {
+        setPassError('Current password is incorrect.');
+        return;
+      }
+
       const { error } = await supabase.auth.updateUser({ password: newPass });
       if (error) {
         setPassError(error.message);
       } else {
         setPassSaved(true);
+        setCurrentPass('');
         setNewPass('');
         setConfirmPass('');
         setTimeout(() => setPassSaved(false), 4000);
@@ -354,17 +378,15 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto pb-24 md:pb-8">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
         <Sidebar
-          selectedCategoryId={null}
           selectedFolderId={null}
           isUnfiledOnly={false}
           onSelectAll={() => {}}
           onSelectUnfiled={() => {}}
-          onSelectCategory={() => {}}
           onSelectFolder={() => {}}
         />
 
@@ -411,8 +433,8 @@ export default function SettingsPage() {
             )}
 
             {/* Avatar Section */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 pb-5 border-b border-zinc-800/80">
-              <div className="relative group">
+            <div className="flex flex-col sm:flex-row items-start gap-5 pb-5 border-b border-zinc-800/80">
+              <div className="relative group shrink-0">
                 <div className="w-20 h-20 rounded-2xl overflow-hidden bg-indigo-950/80 border-2 border-zinc-700 flex items-center justify-center shadow-lg">
                   {avatarUrl ? (
                     <img src={avatarUrl} alt={username} className="w-full h-full object-cover" />
@@ -427,7 +449,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3 flex-1 max-w-md w-full">
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all active:scale-95">
                     <Camera size={14} />
@@ -450,9 +472,39 @@ export default function SettingsPage() {
                     </button>
                   )}
                 </div>
-                <p className="text-[11px] text-zinc-500">
-                  Upload an image from your device (PNG, JPG, or WebP up to 3MB) or enter an image URL below.
-                </p>
+
+                {/* Avatar Image URL section right below Upload Photo */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-zinc-400 mb-1 uppercase tracking-wider">
+                    Avatar Image URL (Optional)
+                  </label>
+                  {avatarUrl && avatarUrl.includes('/storage/v1/object/public/avatars/') ? (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300">
+                      <span className="flex items-center gap-2 text-indigo-300 font-medium text-[11px]">
+                        <Check size={13} className="text-emerald-400" />
+                        Custom photo uploaded from device
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        className="text-[11px] text-red-400 hover:text-red-300 font-medium transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="url"
+                      placeholder="https://example.com/avatar.jpg"
+                      value={avatarUrl}
+                      onChange={e => setAvatarUrl(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  )}
+                  <p className="text-[11px] text-zinc-500 mt-1">
+                    Upload an image from your device above, or enter an external image URL.
+                  </p>
+                </div>
                 {avatarError && <p className="text-[11px] text-red-400 font-medium">{avatarError}</p>}
               </div>
             </div>
@@ -490,38 +542,6 @@ export default function SettingsPage() {
                   onChange={e => setDisplayName(e.target.value)}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
-                  Avatar Image URL (Optional)
-                </label>
-                {avatarUrl && avatarUrl.includes('/storage/v1/object/public/avatars/') ? (
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300">
-                    <span className="flex items-center gap-2 text-indigo-300 font-medium">
-                      <Check size={14} className="text-emerald-400" />
-                      Custom photo uploaded from device
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleRemoveAvatar}
-                      className="text-[11px] text-red-400 hover:text-red-300 font-medium transition-colors"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <input
-                    type="url"
-                    placeholder="https://example.com/avatar.jpg"
-                    value={avatarUrl}
-                    onChange={e => setAvatarUrl(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                )}
-                <p className="text-[11px] text-zinc-500 mt-1">
-                  Upload an image above, or enter an external image URL.
-                </p>
               </div>
 
               <button
@@ -653,6 +673,20 @@ export default function SettingsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-400 mb-1 uppercase tracking-wider">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={currentPass}
+                  onChange={e => setCurrentPass(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 mb-1 uppercase tracking-wider">
                   New Password (min 8 characters)
                 </label>
                 <input
@@ -699,7 +733,7 @@ export default function SettingsPage() {
               <span>Danger Zone: Permanent Account Deletion</span>
             </h2>
             <p className="text-xs text-zinc-400 leading-relaxed max-w-xl">
-              Permanently delete your Linkiac account, including all your saved links, folders, categories, private tags, friendships, and outgoing suggestions. Any links already accepted by friends into their own libraries will be preserved as their independent property.
+              Permanently delete your Linkiac account, including all your saved links, folders, categories, friendships, and outgoing suggestions. Any links already accepted by friends into their own libraries will be preserved as their independent property.
             </p>
 
             {deleteError && (

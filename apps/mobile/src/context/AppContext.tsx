@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { AppState, AppStateStatus, Alert } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import {
@@ -7,7 +7,6 @@ import {
   Category,
   Folder,
   Link,
-  Tag,
   Friendship,
   SendRecipient,
   DomainStat,
@@ -15,6 +14,8 @@ import {
   parseNormalizedDomain,
   ParsedBookmark,
   extractDefaultThumbnail,
+  packSharedComment,
+  unpackSharedComment,
 } from '@linkiac/shared';
 import { supabase } from '../../lib/supabase';
 
@@ -39,7 +40,6 @@ export interface AddLinkInput {
   reading_status?: ReadingStatus;
   category_id?: string | null;
   folder_id?: string | null;
-  tags?: string[];
   thumbnail_url?: string | null;
 }
 
@@ -61,11 +61,34 @@ interface AppContextType {
   addFolder: (name: string, category_id?: string | null, parent_folder_id?: string | null) => Promise<Folder>;
   deleteFolder: (id: string) => Promise<void>;
   updateProfile: (updates: { username?: string; display_name?: string; avatar_url?: string | null }) => Promise<void>;
-  acceptSuggestion: (suggestionId: string, options?: { category_id?: string | null; folder_id?: string | null }) => Promise<Link | null>;
+  acceptSuggestion: (
+    suggestionId: string,
+    options?: {
+      category_id?: string | null;
+      folder_id?: string | null;
+      title?: string | null;
+      comment?: string | null;
+    }
+  ) => Promise<Link | null>;
   rejectSuggestion: (suggestionId: string) => Promise<void>;
   acceptFriendRequest: (friendshipId: string) => Promise<void>;
   removeFriend: (friendshipId: string) => Promise<void>;
-  sendLinkToFriend: (data: { url: string; comment?: string | null; recipient_id: string }) => Promise<void>;
+  sendLinkToFriends: (data: {
+    url: string;
+    title?: string | null;
+    comment?: string | null;
+    recipient_ids: string[];
+    source_link_id?: string | null;
+    thumbnail_url?: string | null;
+  }) => Promise<void>;
+  sendLinkToFriend: (data: {
+    url: string;
+    title?: string | null;
+    comment?: string | null;
+    recipient_id: string;
+    source_link_id?: string | null;
+    thumbnail_url?: string | null;
+  }) => Promise<void>;
   bulkMoveLinks: (linkIds: string[], categoryId: string | null, folderId: string | null) => Promise<void>;
   bulkDeleteLinks: (linkIds: string[]) => Promise<void>;
   importBookmarks: (items: ParsedBookmark[]) => Promise<{ importedCount: number; foldersCount: number }>;
@@ -83,8 +106,8 @@ export function generateUUID(): string {
   });
 }
 
-export function isValidUUID(str: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+export function isValidUUID(str?: string | null): boolean {
+  return Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -100,8 +123,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [suggestions, setSuggestions] = useState<SendRecipient[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const isInitialSuggestionsSyncRef = useRef(true);
-  const knownSuggestionIdsRef = useRef<Set<string>>(new Set());
 
   // Sign out handler (scoped locally to preserve sessions on other devices)
   const signOut = useCallback(async () => {
@@ -169,7 +190,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const [linksRes, catsRes, foldersRes, friendsRes, suggestionsRes] = await Promise.allSettled([
         supabase
           .from('links')
-          .select('*, link_tags(tag:tags(*))')
+          .select('*')
           .eq('user_id', authUser.id)
           .order('created_at', { ascending: false }),
         supabase
@@ -196,22 +217,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       if (linksRes.status === 'fulfilled' && !linksRes.value.error && Array.isArray(linksRes.value.data)) {
-        const transformed: Link[] = linksRes.value.data.map((l: any) => ({
-          id: l.id,
-          user_id: l.user_id || authUser.id,
-          url: l.url,
-          title: l.title || null,
-          comment: l.comment || null,
-          domain: l.domain || parseNormalizedDomain(l.url),
-          reading_status: l.reading_status || 'to_read',
-          thumbnail_url: l.thumbnail_url || null,
-          thumbnail_source: l.thumbnail_source || (l.thumbnail_url ? 'auto' : 'none'),
-          category_id: l.category_id || null,
-          folder_id: l.folder_id || null,
-          tags: l.link_tags?.map((lt: any) => lt.tag).filter(Boolean) || [],
-          created_at: l.created_at,
-          updated_at: l.updated_at || l.created_at,
-        }));
+        const transformed: Link[] = linksRes.value.data.map((l: any) => {
+          const rawTitle = l.title ? String(l.title).trim() : '';
+          const isPollutedTitle = !rawTitle || rawTitle.toLowerCase().startsWith('shared by @');
+          const cleanTitle = isPollutedTitle
+            ? (l.domain || parseNormalizedDomain(l.url) || l.url || 'Saved link')
+            : rawTitle;
+
+          // Auto-heal legacy database rows asynchronously
+          if (isPollutedTitle && l.id && isValidUUID(l.id)) {
+            supabase.from('links').update({ title: cleanTitle }).eq('id', l.id).then(() => {});
+          }
+
+          return {
+            id: l.id,
+            user_id: l.user_id || authUser.id,
+            url: l.url,
+            title: cleanTitle,
+            comment: l.comment || null,
+            domain: l.domain || parseNormalizedDomain(l.url),
+            reading_status: l.reading_status || 'to_read',
+            thumbnail_url: l.thumbnail_url || null,
+            thumbnail_source: l.thumbnail_source || (l.thumbnail_url ? 'auto' : 'none'),
+            category_id: l.category_id || null,
+            folder_id: l.folder_id || null,
+            created_at: l.created_at,
+            updated_at: l.updated_at || l.created_at,
+          };
+        });
         setLinks(transformed);
       }
 
@@ -261,42 +294,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const snd = s.send || sendMap.get(s.send_id);
           if (!snd) return s;
           const sender = snd.sender && snd.sender.username ? snd.sender : profileMap.get(snd.sender_id);
+          const { title: unpackedTitle, note: unpackedNote } = unpackSharedComment(snd.comment);
+          const effectiveSendTitle = snd.title || unpackedTitle || snd.source_link?.title || null;
+          const effectiveSendComment = unpackedTitle ? unpackedNote : snd.comment;
+
           return {
             ...s,
             send: {
               ...snd,
+              title: effectiveSendTitle,
+              comment: effectiveSendComment,
               sender: sender || snd.sender || null,
             },
           };
         });
 
         setSuggestions(updatedSuggestions);
-
-        // Detect new incoming recommendations and trigger an in-app alert
-        const currentSuggestionIds = new Set(updatedSuggestions.map(s => s.id));
-        if (isInitialSuggestionsSyncRef.current) {
-          knownSuggestionIdsRef.current = currentSuggestionIds;
-          isInitialSuggestionsSyncRef.current = false;
-        } else {
-          const newSuggestions = updatedSuggestions.filter(s => !knownSuggestionIdsRef.current.has(s.id));
-          if (newSuggestions.length > 0) {
-            const first = newSuggestions[0];
-            const senderName =
-              first.send?.sender?.display_name ||
-              (first.send?.sender?.username ? `@${first.send?.sender?.username}` : 'A friend');
-            const alertTitle = 'New Recommendation Received!';
-            const alertMessage =
-              newSuggestions.length === 1
-                ? `${senderName} recommended a link: "${first.send?.url || 'New link'}"`
-                : `${senderName} and others sent you ${newSuggestions.length} new recommendations!`;
-
-            Alert.alert(alertTitle, alertMessage, [
-              { text: 'Later', style: 'cancel' },
-              { text: 'View Inbox', onPress: () => routerRef.current.push('/(tabs)/inbox' as any) },
-            ]);
-          }
-          knownSuggestionIdsRef.current = currentSuggestionIds;
-        }
       }
     } catch (err) {
       console.warn('Linkiac mobile background sync notice:', err);
@@ -348,21 +361,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Auto-poll Supabase every 4 seconds so updates from Web appear on Mobile automatically
-    const pollInterval = setInterval(() => {
-      syncAllFromSupabase();
-    }, 4000);
+    // Controlled polling: only active when app is in foreground (saves battery & network)
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    const startPolling = () => {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(() => {
+        if (AppState.currentState === 'active') {
+          syncAllFromSupabase();
+        }
+      }, 15000);
+    };
 
-    // Sync when app comes to foreground
+    const stopPolling = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    };
+
+    if (AppState.currentState === 'active') {
+      startPolling();
+    }
+
+    // Sync when app comes to foreground, stop when backgrounded
     const appStateSub = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         syncAllFromSupabase();
+        startPolling();
+      } else {
+        stopPolling();
       }
     });
 
     return () => {
       authListener.unsubscribe();
-      clearInterval(pollInterval);
+      stopPolling();
       appStateSub.remove();
     };
   }, [syncAllFromSupabase]);
@@ -425,12 +458,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       thumbnail_source: resolvedThumbnail ? 'auto' : 'none',
       category_id: input.category_id || null,
       folder_id: input.folder_id || null,
-      tags: (input.tags || []).map(t => ({
-        id: generateUUID(),
-        user_id: currentUser.id,
-        name: t,
-        created_at: now,
-      })),
       created_at: now,
       updated_at: now,
     };
@@ -439,33 +466,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Push to Supabase
     try {
-      await supabase.from('links').insert({
-        id: newId,
-        user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-        url: newLink.url,
-        title: newLink.title,
-        comment: newLink.comment,
-        reading_status: newLink.reading_status,
-        thumbnail_url: newLink.thumbnail_url,
-        thumbnail_source: newLink.thumbnail_source,
-        category_id: newLink.category_id && isValidUUID(newLink.category_id) ? newLink.category_id : null,
-        folder_id: newLink.folder_id && isValidUUID(newLink.folder_id) ? newLink.folder_id : null,
-        domain: newLink.domain,
-      });
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+      const effectiveUserId = authUser?.id || (isValidUUID(currentUser.id) ? currentUser.id : null);
 
-      // Handle tags
-      for (const tag of newLink.tags || []) {
-        if (isValidUUID(tag.id)) {
-          await supabase.from('tags').upsert({
-            id: tag.id,
-            user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-            name: tag.name,
-          });
-          await supabase.from('link_tags').upsert({
-            link_id: newId,
-            tag_id: tag.id,
-          });
-        }
+      if (effectiveUserId) {
+        await supabase.from('links').insert({
+          id: newId,
+          user_id: effectiveUserId,
+          url: newLink.url,
+          title: newLink.title,
+          comment: newLink.comment,
+          reading_status: newLink.reading_status,
+          thumbnail_url: newLink.thumbnail_url,
+          thumbnail_source: newLink.thumbnail_source,
+          category_id: newLink.category_id && isValidUUID(newLink.category_id) ? newLink.category_id : null,
+          folder_id: newLink.folder_id && isValidUUID(newLink.folder_id) ? newLink.folder_id : null,
+          domain: newLink.domain,
+        });
       }
     } catch (e) {
       console.warn('Supabase mobile link insert notice:', e);
@@ -476,30 +495,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [currentUser.id, syncAllFromSupabase]);
 
   const updateLink = useCallback(async (id: string, updates: Partial<Link>) => {
-    setLinks(prev => prev.map(l => (l.id === id ? { ...l, ...updates, updated_at: new Date().toISOString() } : l)));
+    setLinks(prev =>
+      prev.map(l => {
+        if (l.id !== id) return l;
+        return {
+          ...l,
+          ...updates,
+          updated_at: new Date().toISOString(),
+        };
+      })
+    );
 
     if (isValidUUID(id)) {
       try {
-        const dbUpdates: any = { ...updates, updated_at: new Date().toISOString() };
-        delete dbUpdates.tags;
-        delete dbUpdates.link_tags;
-        if (dbUpdates.category_id && !isValidUUID(dbUpdates.category_id)) dbUpdates.category_id = null;
-        if (dbUpdates.folder_id && !isValidUUID(dbUpdates.folder_id)) dbUpdates.folder_id = null;
-        await supabase.from('links').update(dbUpdates).eq('id', id);
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        const effectiveUserId = authUser?.id || (isValidUUID(currentUser.id) ? currentUser.id : null);
+
+        if (effectiveUserId) {
+          const dbUpdates: any = { ...updates, updated_at: new Date().toISOString() };
+          if (dbUpdates.category_id && !isValidUUID(dbUpdates.category_id)) dbUpdates.category_id = null;
+          if (dbUpdates.folder_id && !isValidUUID(dbUpdates.folder_id)) dbUpdates.folder_id = null;
+          await supabase.from('links').update(dbUpdates).eq('id', id);
+        }
       } catch (e) {
         console.warn('Supabase mobile link update notice:', e);
       }
     }
 
     syncAllFromSupabase();
-  }, [syncAllFromSupabase]);
+  }, [currentUser.id, syncAllFromSupabase]);
 
   const deleteLink = useCallback(async (id: string) => {
     setLinks(prev => prev.filter(l => l.id !== id));
 
     if (isValidUUID(id)) {
       try {
-        await supabase.from('link_tags').delete().eq('link_id', id);
         await supabase.from('links').delete().eq('id', id);
       } catch (e) {
         console.warn('Supabase mobile link delete notice:', e);
@@ -548,7 +580,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const validIds = linkIds.filter(isValidUUID);
       if (validIds.length > 0) {
-        await supabase.from('link_tags').delete().in('link_id', validIds);
         await supabase.from('links').delete().in('id', validIds);
       }
     } catch (e) {
@@ -607,7 +638,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         thumbnail_source: 'none',
         category_id: null,
         folder_id: folderId,
-        tags: [],
         created_at: now,
         updated_at: now,
       };
@@ -812,7 +842,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const acceptSuggestion = useCallback(async (
     suggestionId: string,
-    options?: { category_id?: string | null; folder_id?: string | null }
+    options?: {
+      category_id?: string | null;
+      folder_id?: string | null;
+      title?: string | null;
+      comment?: string | null;
+    }
   ): Promise<Link | null> => {
     const item = suggestions.find(s => s.id === suggestionId);
     if (!item) return null;
@@ -821,19 +856,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const domain = parseNormalizedDomain(item.send?.url || '');
     const now = new Date().toISOString();
 
+    const { title: unpackedTitle, note: unpackedNote } = unpackSharedComment(item.send?.comment);
+    const rawSendTitle = item.send?.title ? String(item.send.title).trim() : '';
+    const rawSourceTitle = item.send?.source_link?.title ? String(item.send.source_link.title).trim() : '';
+    const customTitle = options?.title ? String(options.title).trim() : '';
+    let effectiveTitle = customTitle || rawSendTitle || unpackedTitle || rawSourceTitle;
+
+    // Never allow 'Shared by @...' to become the link title
+    if (!effectiveTitle || effectiveTitle.toLowerCase().startsWith('shared by @')) {
+      effectiveTitle = domain || item.send?.url || 'Saved link';
+    }
+
+    const effectiveComment = options?.comment !== undefined ? options.comment : (unpackedTitle ? unpackedNote : (item.send?.comment || null));
+
     const createdLink: Link = {
       id: newLinkId,
       user_id: currentUser.id,
       url: item.send?.url || '',
-      title: item.send?.sender ? `Shared by @${item.send.sender.username}` : 'Suggested link',
-      comment: item.send?.comment || null,
+      title: effectiveTitle,
+      comment: effectiveComment,
       domain,
       reading_status: 'to_read',
       thumbnail_url: item.send?.thumbnail_url || null,
       thumbnail_source: item.send?.thumbnail_url ? 'auto' : 'none',
       category_id: options?.category_id || null,
       folder_id: options?.folder_id || null,
-      tags: [],
       created_at: now,
       updated_at: now,
     };
@@ -841,32 +888,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLinks(prev => [createdLink, ...prev]);
     setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
 
-    // Push to Supabase via atomic RPC or fallback
+    // Persist to Supabase: direct insert first with correct title, update suggestion status
     try {
       if (isValidUUID(currentUser.id) && isValidUUID(suggestionId)) {
-        const { error: rpcErr } = await supabase.rpc('accept_friend_suggestion', {
-          p_suggestion_id: suggestionId,
-          p_category_id: options?.category_id && isValidUUID(options.category_id) ? options.category_id : null,
-          p_folder_id: options?.folder_id && isValidUUID(options.folder_id) ? options.folder_id : null,
-          p_custom_comment: item.send?.comment || null,
+        const { error: insertErr } = await supabase.from('links').insert({
+          id: newLinkId,
+          user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
+          url: item.send?.url || '',
+          title: effectiveTitle,
+          comment: createdLink.comment,
+          domain,
+          reading_status: 'to_read',
+          thumbnail_url: createdLink.thumbnail_url,
+          thumbnail_source: createdLink.thumbnail_source,
+          category_id: options?.category_id && isValidUUID(options.category_id) ? options.category_id : null,
+          folder_id: options?.folder_id && isValidUUID(options.folder_id) ? options.folder_id : null,
         });
 
-        if (rpcErr) {
-          console.warn('accept_friend_suggestion RPC notice, using fallback:', rpcErr);
-          await supabase.from('links').insert({
-            id: newLinkId,
-            user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-            url: item.send?.url || '',
-            title: createdLink.title,
-            comment: createdLink.comment,
-            domain,
-            reading_status: 'to_read',
-            thumbnail_url: createdLink.thumbnail_url,
-            thumbnail_source: createdLink.thumbnail_source,
-            category_id: options?.category_id && isValidUUID(options.category_id) ? options.category_id : null,
-            folder_id: options?.folder_id && isValidUUID(options.folder_id) ? options.folder_id : null,
-          });
-
+        if (!insertErr) {
           await supabase
             .from('send_recipients')
             .update({
@@ -875,6 +914,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               decided_at: now,
             })
             .eq('id', suggestionId);
+        } else {
+          console.warn('Direct link insert notice, attempting RPC fallback:', insertErr);
+          const { data: rpcLinkId, error: rpcErr } = await supabase.rpc('accept_friend_suggestion', {
+            p_suggestion_id: suggestionId,
+            p_category_id: options?.category_id && isValidUUID(options.category_id) ? options.category_id : null,
+            p_folder_id: options?.folder_id && isValidUUID(options.folder_id) ? options.folder_id : null,
+            p_custom_comment: effectiveComment,
+          });
+
+          // Enforce clean title and custom comment if legacy RPC set it
+          if (!rpcErr && rpcLinkId) {
+            await supabase.from('links').update({ title: effectiveTitle, comment: effectiveComment }).eq('id', rpcLinkId);
+          }
         }
       }
     } catch (e) {
@@ -946,44 +998,160 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     syncAllFromSupabase();
   }, [syncAllFromSupabase]);
 
-  const sendLinkToFriend = useCallback(async (data: { url: string; comment?: string | null; recipient_id: string }) => {
-    const sendId = generateUUID();
-    const recId = generateUUID();
+  const sendLinkToFriends = useCallback(async (data: {
+    url: string;
+    title?: string | null;
+    comment?: string | null;
+    recipient_ids: string[];
+    source_link_id?: string | null;
+    thumbnail_url?: string | null;
+  }) => {
+    const validRecipientIds = (data.recipient_ids || []).filter(isValidUUID);
+    const trimmedUrl = data.url ? data.url.trim() : '';
 
-    try {
-      if (isValidUUID(currentUser.id) && isValidUUID(data.recipient_id)) {
-        const { error: rpcErr } = await supabase.rpc('send_link_to_recipients', {
-          p_url: data.url,
-          p_comment: data.comment || null,
-          p_recipient_ids: [data.recipient_id],
-          p_source_link_id: null,
-          p_thumbnail_url: null,
-        });
-
-        if (rpcErr) {
-          console.warn('send_link_to_recipients RPC notice, using fallback:', rpcErr);
-          await supabase.from('sends').insert({
-            id: sendId,
-            sender_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-            url: data.url,
-            comment: data.comment || null,
-          });
-
-          await supabase.from('send_recipients').insert({
-            id: recId,
-            send_id: sendId,
-            recipient_id: data.recipient_id,
-            status: 'pending',
-            reading_status: 'to_read',
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('Supabase sendLinkToFriend notice:', e);
+    if (!trimmedUrl) {
+      throw new Error('URL is required to share.');
+    }
+    if (validRecipientIds.length === 0) {
+      throw new Error('Please select at least one valid friend to send to.');
     }
 
-    syncAllFromSupabase();
+    // Resolve authenticated user ID
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const effectiveUserId = authUser?.id || (isValidUUID(currentUser.id) ? currentUser.id : null);
+    if (!effectiveUserId) {
+      throw new Error('You must be signed in to send link recommendations.');
+    }
+
+    const comment = data.comment?.trim() || null;
+    const sourceLinkId = data.source_link_id && isValidUUID(data.source_link_id) ? data.source_link_id : null;
+    const thumbnailUrl = data.thumbnail_url || null;
+    const title = data.title?.trim() || null;
+    const packedComment = packSharedComment(title, comment);
+
+    let sendSuccess = false;
+
+    // TIER 1: Attempt atomic RPC with 6 parameters (including p_title)
+    try {
+      const { error: rpc6Err } = await supabase.rpc('send_link_to_recipients', {
+        p_url: trimmedUrl,
+        p_comment: packedComment,
+        p_recipient_ids: validRecipientIds,
+        p_source_link_id: sourceLinkId,
+        p_thumbnail_url: thumbnailUrl,
+        p_title: title,
+      });
+
+      if (!rpc6Err) {
+        sendSuccess = true;
+      } else {
+        const isSignatureMismatch =
+          rpc6Err.code === 'PGRST202' ||
+          rpc6Err.message?.toLowerCase().includes('schema cache') ||
+          rpc6Err.message?.toLowerCase().includes('could not find the function');
+
+        if (isSignatureMismatch) {
+          // TIER 2: Fallback to existing 5-parameter RPC signature in production database
+          const { data: rpc5SendId, error: rpc5Err } = await supabase.rpc('send_link_to_recipients', {
+            p_url: trimmedUrl,
+            p_comment: packedComment,
+            p_recipient_ids: validRecipientIds,
+            p_source_link_id: sourceLinkId,
+            p_thumbnail_url: thumbnailUrl,
+          });
+
+          if (!rpc5Err) {
+            sendSuccess = true;
+            if (rpc5SendId && title) {
+              supabase.from('sends').update({ title }).eq('id', rpc5SendId).then(() => {});
+            }
+          } else {
+            console.warn('5-param send_link_to_recipients RPC failed:', rpc5Err);
+          }
+        } else {
+          console.warn('6-param send_link_to_recipients RPC failed:', rpc6Err);
+        }
+      }
+    } catch (rpcEx) {
+      console.warn('RPC execution exception, attempting direct fallback:', rpcEx);
+    }
+
+    // TIER 3: Direct table insert fallback
+    if (!sendSuccess) {
+      const sendId = generateUUID();
+      const baseSendPayload = {
+        id: sendId,
+        sender_id: effectiveUserId,
+        url: trimmedUrl,
+        comment: packedComment,
+        thumbnail_url: thumbnailUrl,
+        source_link_id: sourceLinkId,
+      };
+
+      let insertErr: any = null;
+      if (title) {
+        const { error } = await supabase.from('sends').insert({
+          ...baseSendPayload,
+          title: title,
+        });
+        insertErr = error;
+      } else {
+        const { error } = await supabase.from('sends').insert(baseSendPayload);
+        insertErr = error;
+      }
+
+      // If failed due to missing sends.title column (code 42703), retry without title
+      if (insertErr && (insertErr.code === '42703' || insertErr.message?.toLowerCase().includes('title'))) {
+        const { error: retryErr } = await supabase.from('sends').insert(baseSendPayload);
+        insertErr = retryErr;
+      }
+
+      if (insertErr) {
+        console.error('Direct send master insert failed:', insertErr);
+        throw new Error(insertErr.message || 'Failed to create recommendation master record.');
+      }
+
+      const recipientRows = validRecipientIds
+        .filter(rid => rid !== effectiveUserId)
+        .map(recipientId => ({
+          id: generateUUID(),
+          send_id: sendId,
+          recipient_id: recipientId,
+          status: 'pending',
+          reading_status: 'to_read',
+        }));
+
+      if (recipientRows.length > 0) {
+        const { error: recErr } = await supabase.from('send_recipients').insert(recipientRows);
+        if (recErr) {
+          console.error('Direct send_recipients insert failed:', recErr);
+          throw new Error(recErr.message || 'Failed to deliver recommendations to selected friends.');
+        }
+      }
+
+      sendSuccess = true;
+    }
+
+    await syncAllFromSupabase();
   }, [currentUser.id, syncAllFromSupabase]);
+
+  const sendLinkToFriend = useCallback(async (data: {
+    url: string;
+    title?: string | null;
+    comment?: string | null;
+    recipient_id: string;
+    source_link_id?: string | null;
+    thumbnail_url?: string | null;
+  }) => {
+    return sendLinkToFriends({
+      url: data.url,
+      title: data.title,
+      comment: data.comment,
+      recipient_ids: [data.recipient_id],
+      source_link_id: data.source_link_id,
+      thumbnail_url: data.thumbnail_url,
+    });
+  }, [sendLinkToFriends]);
 
   const value = useMemo(
     () => ({
@@ -1008,6 +1176,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rejectSuggestion,
       acceptFriendRequest,
       removeFriend,
+      sendLinkToFriends,
       sendLinkToFriend,
       bulkMoveLinks,
       bulkDeleteLinks,
@@ -1036,6 +1205,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rejectSuggestion,
       acceptFriendRequest,
       removeFriend,
+      sendLinkToFriends,
       sendLinkToFriend,
       bulkMoveLinks,
       bulkDeleteLinks,

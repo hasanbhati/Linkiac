@@ -11,6 +11,9 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import {
@@ -21,13 +24,12 @@ import {
   Inbox as InboxIcon,
   MessageSquare,
   Folder,
-  Tag,
 } from 'lucide-react-native';
-import { isSafeWebUrl, ensureUrlProtocol, SendRecipient } from '@linkiac/shared';
+import { isSafeWebUrl, ensureUrlProtocol, SendRecipient, parseNormalizedDomain, unpackSharedComment } from '@linkiac/shared';
 import { useApp } from '../../src/context/AppContext';
 
 export default function MobileInboxScreen() {
-  const { currentUser, suggestions, categories, folders, acceptSuggestion, rejectSuggestion, syncAllFromSupabase } = useApp();
+  const { currentUser, suggestions, folders, acceptSuggestion, rejectSuggestion, syncAllFromSupabase } = useApp();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -37,7 +39,8 @@ export default function MobileInboxScreen() {
 
   // Destination filing modal state
   const [acceptingItem, setAcceptingItem] = useState<SendRecipient | null>(null);
-  const [targetCategoryId, setTargetCategoryId] = useState<string | null>(null);
+  const [titleInput, setTitleInput] = useState('');
+  const [commentInput, setCommentInput] = useState('');
   const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
 
@@ -87,8 +90,16 @@ export default function MobileInboxScreen() {
 
   const handleOpenAcceptModal = (item: SendRecipient) => {
     setAcceptingItem(item);
-    setTargetCategoryId(null);
     setTargetFolderId(null);
+    const { title: unpackedTitle, note: unpackedNote } = unpackSharedComment(item.send?.comment);
+    setCommentInput(unpackedNote || (unpackedTitle ? '' : (item.send?.comment || '')));
+    const rawSendTitle = item.send?.title ? String(item.send.title).trim() : '';
+    const rawSourceTitle = item.send?.source_link?.title ? String(item.send.source_link.title).trim() : '';
+    let initialTitle = rawSendTitle || unpackedTitle || rawSourceTitle;
+    if (!initialTitle || initialTitle.toLowerCase().startsWith('shared by @')) {
+      initialTitle = (item.send?.url ? parseNormalizedDomain(item.send.url) : '') || item.send?.url || '';
+    }
+    setTitleInput(initialTitle);
   };
 
   const handleConfirmAccept = async () => {
@@ -96,8 +107,10 @@ export default function MobileInboxScreen() {
     setIsAccepting(true);
     try {
       const link = await acceptSuggestion(acceptingItem.id, {
-        category_id: targetCategoryId,
+        category_id: null,
         folder_id: targetFolderId,
+        title: titleInput.trim() || null,
+        comment: commentInput.trim() || null,
       });
       if (link) {
         Alert.alert(
@@ -115,7 +128,7 @@ export default function MobileInboxScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Suggestions Inbox</Text>
+      <Text style={styles.heading}>Inbox</Text>
       <Text style={styles.subheading}>Links sent privately from your accepted friends</Text>
 
       <FlatList
@@ -147,9 +160,16 @@ export default function MobileInboxScreen() {
           const senderDisplayName = item.send?.sender?.display_name || senderUsername;
           const senderAvatar = item.send?.sender?.avatar_url;
           const url = item.send?.url || '';
-          const comment = item.send?.comment;
           const isProcessing = processingId === item.id;
           const isWeb = isSafeWebUrl(url);
+          const { title: unpackedTitle, note: unpackedNote } = unpackSharedComment(item.send?.comment);
+          const rawSendTitle = item.send?.title ? String(item.send.title).trim() : '';
+          const rawSourceTitle = item.send?.source_link?.title ? String(item.send.source_link.title).trim() : '';
+          let itemTitle = rawSendTitle || unpackedTitle || rawSourceTitle;
+          if (itemTitle.toLowerCase().startsWith('shared by @')) {
+            itemTitle = '';
+          }
+          const displayComment = unpackedTitle ? unpackedNote : item.send?.comment;
 
           return (
             <View style={styles.card}>
@@ -170,14 +190,19 @@ export default function MobileInboxScreen() {
                 </View>
               </View>
 
-              {/* URL - tap to preview */}
+              {/* URL & Title - tap to preview */}
               {url ? (
                 <TouchableOpacity
                   style={styles.urlTouchable}
                   activeOpacity={0.7}
                   onPress={() => handleOpenUrl(url)}
                 >
-                  <Text style={styles.urlText} numberOfLines={2}>
+                  {itemTitle ? (
+                    <Text style={styles.cardItemTitle} numberOfLines={2}>
+                      {itemTitle}
+                    </Text>
+                  ) : null}
+                  <Text style={itemTitle ? styles.cardUrlSubtext : styles.urlText} numberOfLines={itemTitle ? 1 : 2}>
                     {url}
                   </Text>
                   {isWeb && (
@@ -190,10 +215,10 @@ export default function MobileInboxScreen() {
               ) : null}
 
               {/* Sender's Comment / Note */}
-              {comment ? (
+              {displayComment ? (
                 <View style={styles.commentBox}>
                   <MessageSquare color="#a1a1aa" size={12} style={{ marginTop: 2 }} />
-                  <Text style={styles.commentText}>"{comment}"</Text>
+                  <Text style={styles.commentText}>"{displayComment}"</Text>
                 </View>
               ) : null}
 
@@ -231,98 +256,81 @@ export default function MobileInboxScreen() {
         transparent
         onRequestClose={() => setAcceptingItem(null)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
+            {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Save Suggestion</Text>
-              <TouchableOpacity onPress={() => setAcceptingItem(null)}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Check color="#34d399" size={18} />
+                <Text style={styles.modalTitle}>Accept to My Library</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setAcceptingItem(null)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <X color="#a1a1aa" size={20} />
               </TouchableOpacity>
             </View>
 
-            {acceptingItem && (
-              <View style={styles.modalItemPreview}>
-                <Text style={styles.modalSenderLabel}>
-                  From @{acceptingItem.send?.sender?.username || 'friend'}
-                </Text>
-                <Text style={styles.modalUrlPreview} numberOfLines={2}>
-                  {acceptingItem.send?.url}
-                </Text>
-                {acceptingItem.send?.comment ? (
-                  <Text style={styles.modalCommentPreview}>
-                    "{acceptingItem.send?.comment}"
+            {/* Scrollable Form Body */}
+            <ScrollView
+              style={styles.modalScrollableBody}
+              contentContainerStyle={styles.modalScrollableContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {acceptingItem && (
+                <View style={styles.modalItemPreview}>
+                  <View style={styles.modalSenderBadge}>
+                    <User color="#818cf8" size={13} />
+                    <Text style={styles.modalSenderLabel}>
+                      Recommended by @{acceptingItem.send?.sender?.username || 'friend'}
+                    </Text>
+                  </View>
+                  <Text style={styles.modalUrlPreview} numberOfLines={2}>
+                    {acceptingItem.send?.url}
                   </Text>
-                ) : null}
-              </View>
-            )}
+                </View>
+              )}
 
-            <Text style={styles.modalSectionTitle}>Choose Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modalScrollRow}>
-              <TouchableOpacity
-                style={[
-                  styles.modalPill,
-                  targetCategoryId === null && styles.modalPillActive,
-                ]}
-                onPress={() => {
-                  setTargetCategoryId(null);
-                  setTargetFolderId(null);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.modalPillText,
-                    targetCategoryId === null && styles.modalPillTextActive,
-                  ]}
-                >
-                  Unfiled
-                </Text>
-              </TouchableOpacity>
-              {categories.map((cat) => (
+              {/* Editable Link Title */}
+              <View style={styles.modalSectionHeader}>
+                <Text style={styles.modalSectionTitle}>Link Title</Text>
+                <Text style={styles.modalSectionSubtitle}>Keep original or edit before saving</Text>
+              </View>
+              <TextInput
+                style={styles.modalTextInput}
+                value={titleInput}
+                onChangeText={setTitleInput}
+                placeholder="Title for your library (keep or edit)..."
+                placeholderTextColor="#71717a"
+                autoCapitalize="sentences"
+                returnKeyType="done"
+              />
+
+              {/* Destination Folder */}
+              <Text style={styles.modalSectionTitle}>File into Folder</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modalScrollRow}>
                 <TouchableOpacity
-                  key={cat.id}
                   style={[
                     styles.modalPill,
-                    targetCategoryId === cat.id && styles.modalPillActive,
+                    targetFolderId === null && styles.modalPillActive,
                   ]}
-                  onPress={() => {
-                    setTargetCategoryId(cat.id);
-                    setTargetFolderId(null);
-                  }}
+                  onPress={() => setTargetFolderId(null)}
                 >
-                  <Tag color={targetCategoryId === cat.id ? '#ffffff' : '#818cf8'} size={12} style={{ marginRight: 4 }} />
                   <Text
                     style={[
                       styles.modalPillText,
-                      targetCategoryId === cat.id && styles.modalPillTextActive,
+                      targetFolderId === null && styles.modalPillTextActive,
                     ]}
                   >
-                    {cat.name}
+                    No folder (Unfiled)
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <Text style={styles.modalSectionTitle}>Choose Folder (Optional)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modalScrollRow}>
-              <TouchableOpacity
-                style={[
-                  styles.modalPill,
-                  targetFolderId === null && styles.modalPillActive,
-                ]}
-                onPress={() => setTargetFolderId(null)}
-              >
-                <Text
-                  style={[
-                    styles.modalPillText,
-                    targetFolderId === null && styles.modalPillTextActive,
-                  ]}
-                >
-                  No Folder
-                </Text>
-              </TouchableOpacity>
-              {folders
-                .filter((f) => !targetCategoryId || f.category_id === targetCategoryId)
-                .map((f) => (
+                {folders.map((f) => (
                   <TouchableOpacity
                     key={f.id}
                     style={[
@@ -342,8 +350,24 @@ export default function MobileInboxScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
+              </ScrollView>
+
+              {/* Personal Note / Comment */}
+              <Text style={styles.modalSectionTitle}>Personal Note (Saved to your copy)</Text>
+              <TextInput
+                style={styles.modalTextarea}
+                value={commentInput}
+                onChangeText={setCommentInput}
+                placeholder="Add your note or retain friend recommendation note..."
+                placeholderTextColor="#71717a"
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                autoCapitalize="sentences"
+              />
             </ScrollView>
 
+            {/* Fixed Footer Actions */}
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalCancelBtn}
@@ -367,7 +391,7 @@ export default function MobileInboxScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -437,6 +461,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27272a',
     marginBottom: 10,
+  },
+  cardItemTitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  cardUrlSubtext: {
+    color: '#818cf8',
+    fontSize: 12,
   },
   urlText: {
     color: '#fafafa',
@@ -539,8 +573,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181b',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '85%',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    maxHeight: '90%',
     borderWidth: 1,
     borderColor: '#27272a',
   },
@@ -548,37 +584,55 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
+  },
+  modalHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   modalTitle: {
     color: '#ffffff',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
   },
+  modalScrollableBody: {
+    maxHeight: 460,
+  },
+  modalScrollableContent: {
+    paddingBottom: 8,
+  },
   modalItemPreview: {
-    backgroundColor: '#121215',
+    backgroundColor: '#09090b',
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#27272a',
     marginBottom: 14,
+  },
+  modalSenderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
   },
   modalSenderLabel: {
     color: '#818cf8',
     fontSize: 12,
     fontWeight: '600',
-    marginBottom: 4,
   },
   modalUrlPreview: {
-    color: '#fafafa',
-    fontSize: 13,
+    color: '#d4d4d8',
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     lineHeight: 18,
   },
-  modalCommentPreview: {
-    color: '#a1a1aa',
-    fontSize: 12,
-    fontStyle: 'italic',
-    marginTop: 6,
+  modalSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 6,
   },
   modalSectionTitle: {
     color: '#a1a1aa',
@@ -586,17 +640,44 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginTop: 8,
-    marginBottom: 8,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  modalSectionSubtitle: {
+    color: '#71717a',
+    fontSize: 11,
+  },
+  modalTextInput: {
+    backgroundColor: '#09090b',
+    color: '#fafafa',
+    fontSize: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  modalTextarea: {
+    backgroundColor: '#09090b',
+    color: '#fafafa',
+    fontSize: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 70,
+    marginBottom: 10,
   },
   modalScrollRow: {
-    marginBottom: 10,
+    marginBottom: 12,
   },
   modalPill: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#27272a',
     marginRight: 8,
@@ -619,7 +700,10 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 18,
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+    paddingTop: 14,
   },
   modalCancelBtn: {
     flex: 1,
@@ -641,7 +725,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: '#4f46e5',
+    backgroundColor: '#059669',
   },
   modalSubmitText: {
     color: '#ffffff',

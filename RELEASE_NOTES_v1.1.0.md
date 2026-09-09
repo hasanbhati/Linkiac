@@ -84,7 +84,7 @@ Linkiac v1.1.0 transitions the platform from a local-state / prototype stage int
 6. **Friend Discovery Search:**
    - Replaced static mock search array with live `ilike` database queries against `public.profiles`.
    - Added dedicated "Find People" search tab in `apps/mobile/app/(tabs)/friends.tsx`.
-   - Backfilled missing `profiles` rows for all existing `auth.users` (resolving discovery for `korneliaf` and all registered accounts).
+   - Backfilled missing `profiles` rows for all existing `auth.users` (resolving discovery for all registered accounts).
 
 7. **Friend Request Role Inversion Fix:**
    - Corrected request categorization into separate **Incoming Requests** (with Accept / Decline) and **Sent Requests** (with Awaiting Response / Cancel).

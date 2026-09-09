@@ -30,10 +30,21 @@ export function SendLinkToFriendsModal({
   onClose,
   onSuccess,
 }: SendLinkToFriendsModalProps) {
-  const { currentUser, friends, sendLinkToFriend } = useApp();
+  const { currentUser, friends, sendLinkToFriends } = useApp();
   const [selectedRecipientIds, setSelectedRecipientIds] = useState<Set<string>>(new Set());
+  const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
   const [isSending, setIsSending] = useState(false);
+
+  React.useEffect(() => {
+    if (visible && links.length === 1) {
+      setTitle(links[0].title || '');
+    } else if (!visible) {
+      setTitle('');
+      setComment('');
+      setSelectedRecipientIds(new Set());
+    }
+  }, [visible, links]);
 
   // Accepted friends list
   const acceptedFriends = useMemo(() => {
@@ -79,14 +90,16 @@ export function SendLinkToFriendsModal({
     setIsSending(true);
     try {
       const recipientIds = Array.from(selectedRecipientIds);
-      for (const recipientId of recipientIds) {
-        for (const link of links) {
-          await sendLinkToFriend({
-            url: link.url,
-            comment: comment.trim() || null,
-            recipient_id: recipientId,
-          });
-        }
+      for (const link of links) {
+        const itemTitle = (links.length === 1 && title.trim()) ? title.trim() : (link.title || null);
+        await sendLinkToFriends({
+          url: link.url,
+          title: itemTitle,
+          comment: comment.trim() || null,
+          recipient_ids: recipientIds,
+          source_link_id: link.id,
+          thumbnail_url: link.thumbnail_url || null,
+        });
       }
 
       const friendNames = acceptedFriends
@@ -150,9 +163,19 @@ export function SendLinkToFriendsModal({
               <Text style={styles.sectionLabel}>SELECTED LINK{links.length === 1 ? '' : 'S'}</Text>
               {links.length === 1 ? (
                 <View style={styles.singleLinkCard}>
-                  <Text style={styles.singleLinkTitle} numberOfLines={1}>
-                    {links[0].title || links[0].url}
-                  </Text>
+                  <View style={styles.titleHeaderRow}>
+                    <Text style={styles.titleHeaderLabel}>LINK TITLE</Text>
+                    <Text style={styles.titleHeaderHint}>Keep or edit before sending</Text>
+                  </View>
+                  <TextInput
+                    style={styles.titleInput}
+                    placeholder="Title for this link..."
+                    placeholderTextColor="#71717a"
+                    value={title}
+                    onChangeText={setTitle}
+                    autoCapitalize="sentences"
+                    returnKeyType="done"
+                  />
                   <Text style={styles.singleLinkUrl} numberOfLines={1}>
                     {links[0].url}
                   </Text>
@@ -330,6 +353,33 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: '#27272a',
+  },
+  titleHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  titleHeaderLabel: {
+    color: '#a1a1aa',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  titleHeaderHint: {
+    color: '#71717a',
+    fontSize: 10,
+  },
+  titleInput: {
+    backgroundColor: '#121215',
+    color: '#fafafa',
+    fontSize: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
   },
   singleLinkTitle: {
     color: '#fafafa',

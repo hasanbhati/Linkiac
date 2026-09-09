@@ -38,7 +38,7 @@ grant execute on function public.get_email_by_username(text) to anon, authentica
 -- ============================================================================
 -- 2. BACKFILL MISSING PROFILES
 -- ============================================================================
--- Ensures any users in auth.users (such as 'korneliaf' or newly created users)
+-- Ensures any users in auth.users (such as existing or newly created users)
 -- who may have missed trigger execution have valid public.profiles records.
 insert into public.profiles (id, username, display_name, avatar_url, is_admin, status, created_at)
 select

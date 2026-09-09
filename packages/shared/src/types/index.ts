@@ -38,14 +38,6 @@ export interface Folder {
   depth?: number;
 }
 
-export interface Tag {
-  id: string;
-  user_id: string;
-  name: string;
-  created_at: string;
-  links_count?: number;
-}
-
 export interface Link {
   id: string;
   user_id: string;
@@ -58,7 +50,6 @@ export interface Link {
   thumbnail_source: ThumbnailSource;
   category_id: string | null;
   folder_id: string | null;
-  tags?: Tag[];
   created_at: string;
   updated_at: string;
 }
@@ -78,9 +69,11 @@ export interface Send {
   id: string;
   sender_id: string;
   url: string;
+  title?: string | null;
   comment: string | null; // Message from sender
   thumbnail_url: string | null;
   source_link_id: string | null;
+  source_link?: Link;
   created_at: string;
   sender?: Profile;
   recipients_count?: number;
@@ -137,6 +130,5 @@ export interface LibraryFilter {
   folderId?: string | null;
   unfiledOnly?: boolean;
   readingStatus?: ReadingStatus | 'all';
-  tagIds?: string[];
   searchQuery?: string;
 }

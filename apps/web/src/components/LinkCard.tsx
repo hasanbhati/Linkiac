@@ -13,7 +13,6 @@ import {
   BookOpen,
   Clock,
   Globe,
-  Tag as TagIcon,
   Check,
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
@@ -310,26 +309,11 @@ export function LinkCard({
 
           {/* Personal Comment */}
           {link.comment && (
-            <p className="text-xs text-zinc-400 italic line-clamp-2 bg-zinc-950/50 p-2 rounded-lg border border-zinc-800/60 mb-3">
+            <p className="text-xs text-zinc-400 italic line-clamp-2 bg-zinc-950/50 p-2 rounded-lg border border-zinc-800/60 mb-2">
               &quot;{link.comment}&quot;
             </p>
           )}
         </div>
-
-        {/* Tag chips */}
-        {link.tags && link.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-2 mt-auto border-t border-zinc-800/60">
-            {link.tags.map(tag => (
-              <span
-                key={tag.id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-zinc-800 text-zinc-400 border border-zinc-700/40 font-medium"
-              >
-                <TagIcon size={10} className="text-zinc-500" />
-                <span>{tag.name}</span>
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

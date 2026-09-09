@@ -34,6 +34,20 @@ function SignupForm() {
 
     try {
       const supabase = getSupabase();
+
+      // Proactively check if username is already taken to prevent silent suffixing (BUG-02)
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('username', cleanUsername)
+        .maybeSingle();
+
+      if (existingUser) {
+        setErrorMsg(`Username @${cleanUsername} is already taken. Please choose another.`);
+        setIsLoading(false);
+        return;
+      }
+
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),

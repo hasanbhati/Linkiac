@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { X, Send, User } from 'lucide-react-native';
-import { Friendship } from '@linkiac/shared';
+import { Friendship, parseNormalizedDomain } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
 
 interface SendFriendLinkModalProps {
@@ -28,6 +28,7 @@ export function SendFriendLinkModal({
 }: SendFriendLinkModalProps) {
   const { currentUser, sendLinkToFriend } = useApp();
   const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
   const [isSending, setIsSending] = useState(false);
 
@@ -38,6 +39,14 @@ export function SendFriendLinkModal({
   const friendDisplayName = other?.display_name || friendUsername;
   const recipientId = friendship.requester_id === currentUser.id ? friendship.recipient_id : friendship.requester_id;
 
+  const handleUrlChange = (newUrl: string) => {
+    setUrl(newUrl);
+    if (!title || title === parseNormalizedDomain(url)) {
+      const domain = parseNormalizedDomain(newUrl);
+      if (domain) setTitle(domain);
+    }
+  };
+
   const handleSend = async () => {
     if (!url.trim()) {
       Alert.alert('Missing URL or Content', 'Please enter a URL, article link, or note to share.');
@@ -46,21 +55,27 @@ export function SendFriendLinkModal({
 
     setIsSending(true);
     try {
+      const trimmedUrl = url.trim();
+      const domainFallback = parseNormalizedDomain(trimmedUrl);
+      const effectiveTitle = title.trim() || domainFallback || trimmedUrl;
+
       await sendLinkToFriend({
-        url: url.trim(),
+        url: trimmedUrl,
+        title: effectiveTitle,
         comment: comment.trim() || null,
         recipient_id: recipientId,
       });
 
       setUrl('');
+      setTitle('');
       setComment('');
       onClose();
       Alert.alert(
         'Link Sent!',
         `Your link was successfully sent to @${friendUsername}'s suggestions inbox.`
       );
-    } catch {
-      Alert.alert('Error', 'Failed to send link. Please try again.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to send link. Please try again.');
     } finally {
       setIsSending(false);
     }
@@ -108,10 +123,26 @@ export function SendFriendLinkModal({
                 placeholder="https://example.com/article, or any idea note"
                 placeholderTextColor="#71717a"
                 value={url}
-                onChangeText={setUrl}
+                onChangeText={handleUrlChange}
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Link Title (Optional)</Text>
+                <Text style={styles.subLabel}>Visible to recipient</Text>
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Title for this link (e.g. Job Offer)..."
+                placeholderTextColor="#71717a"
+                value={title}
+                onChangeText={setTitle}
+                autoCapitalize="sentences"
+                returnKeyType="done"
               />
             </View>
 
@@ -217,11 +248,21 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 16,
   },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   label: {
     color: '#d4d4d8',
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 6,
+  },
+  subLabel: {
+    color: '#71717a',
+    fontSize: 11,
   },
   input: {
     backgroundColor: '#18181b',

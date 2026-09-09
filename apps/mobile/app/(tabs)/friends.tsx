@@ -289,7 +289,7 @@ export default function MobileFriendsScreen() {
             <Search color="#71717a" size={16} />
             <TextInput
               style={styles.input}
-              placeholder="Search by username or name (e.g. korneliaf)..."
+              placeholder="Search by username or name (e.g. alex_curator)..."
               placeholderTextColor="#71717a"
               value={discoverQuery}
               onChangeText={setDiscoverQuery}

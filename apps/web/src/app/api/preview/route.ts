@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validatePreviewUrl, extractDefaultThumbnail } from '@linkiac/shared';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
+    // Require active session to prevent unauthenticated open-proxy abuse
+    const authHeader = req.headers.get('authorization');
+    const supabase = createClient();
+    const token = authHeader?.replace(/^Bearer\s+/i, '');
+    let isAuthenticated = false;
+
+    if (token) {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) isAuthenticated = true;
+    } else {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) isAuthenticated = true;
+    }
+
+    if (!isAuthenticated) {
+      return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
+    }
+
     const body = await req.json();
     const targetUrl = body.url;
 
@@ -77,17 +96,59 @@ export async function POST(req: NextRequest) {
           ? 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
           : 'Twitterbot/1.0';
 
-      const response = await fetch(validation.parsedUrl.toString(), {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': crawlerUa,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-        },
-        redirect: 'follow',
-      });
+      let currentUrl = validation.parsedUrl.toString();
+      let response: Response | null = null;
+      let hops = 0;
+      const MAX_HOPS = 3;
+
+      while (hops < MAX_HOPS) {
+        response = await fetch(currentUrl, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': crawlerUa,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+          },
+          redirect: 'manual',
+        });
+
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+          const locationHeader = response.headers.get('location');
+          if (!locationHeader) break;
+
+          let nextUrl: string;
+          try {
+            nextUrl = new URL(locationHeader, currentUrl).toString();
+          } catch {
+            break;
+          }
+
+          // Strict re-validation of redirected destination URL against SSRF
+          const redirectValidation = validatePreviewUrl(nextUrl);
+          if (!redirectValidation.safe || !redirectValidation.parsedUrl) {
+            clearTimeout(timeout);
+            return NextResponse.json(
+              { success: false, error: 'Redirected host is restricted' },
+              { status: 403 }
+            );
+          }
+
+          currentUrl = nextUrl;
+          hops++;
+        } else {
+          break;
+        }
+      }
 
       clearTimeout(timeout);
+
+      if (!response) {
+        return NextResponse.json({
+          success: true,
+          title: null,
+          thumbnail_url: defaultThumbnail,
+        });
+      }
 
       if (!response.ok) {
         return NextResponse.json({

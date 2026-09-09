@@ -19,21 +19,19 @@ import {
   Plus,
   Inbox,
   Folder as FolderIcon,
-  Tag as TagIcon,
   X,
+  ArrowLeft,
 } from 'lucide-react';
 
 export default function LibraryPage() {
-  const { links, categories, folders, tags, bulkMoveLinks } = useApp();
+  const { links, folders, bulkMoveLinks } = useApp();
 
   // Navigation / Tree filter state
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [isUnfiledOnly, setIsUnfiledOnly] = useState(false);
 
   // Secondary filters
   const [statusFilter, setStatusFilter] = useState<ReadingStatus | 'all'>('all');
-  const [selectedTagNames, setSelectedTagNames] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Bulk selection state
@@ -47,19 +45,32 @@ export default function LibraryPage() {
   const [movingLink, setMovingLink] = useState<LinkType | null>(null);
   const [toastNotice, setToastNotice] = useState<string | null>(null);
 
+  // Folder context
+  const currentFolder = useMemo(() => {
+    return selectedFolderId ? folders.find(f => f.id === selectedFolderId) : null;
+  }, [folders, selectedFolderId]);
+
+  const subfolders = useMemo(() => {
+    return selectedFolderId ? folders.filter(f => f.parent_folder_id === selectedFolderId) : [];
+  }, [folders, selectedFolderId]);
+
+  const parentFolder = useMemo(() => {
+    return currentFolder?.parent_folder_id ? folders.find(f => f.id === currentFolder.parent_folder_id) : null;
+  }, [folders, currentFolder]);
+
   // Active view header title
   const activeViewTitle = useMemo(() => {
-    if (selectedFolderId) {
-      const f = folders.find(folder => folder.id === selectedFolderId);
-      return f ? `Folder: ${f.name}` : 'Folder';
-    }
-    if (selectedCategoryId) {
-      const c = categories.find(cat => cat.id === selectedCategoryId);
-      return c ? `Category: ${c.name}` : 'Category';
-    }
+    if (currentFolder) return `Folder: ${currentFolder.name}`;
     if (isUnfiledOnly) return 'Unfiled Links';
     return 'All Saved Links';
-  }, [selectedFolderId, selectedCategoryId, isUnfiledOnly, folders, categories]);
+  }, [currentFolder, isUnfiledOnly]);
+
+  // Matching folders for search query
+  const matchingFolders = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
+    return folders.filter(f => f.name.toLowerCase().includes(q));
+  }, [folders, searchQuery]);
 
   // Filter links
   const filteredLinks = useMemo(() => {
@@ -67,23 +78,13 @@ export default function LibraryPage() {
       // Tree filing filter
       if (selectedFolderId) {
         if (link.folder_id !== selectedFolderId) return false;
-      } else if (selectedCategoryId) {
-        if (link.category_id !== selectedCategoryId) return false;
       } else if (isUnfiledOnly) {
-        if (link.category_id || link.folder_id) return false;
+        if (link.folder_id) return false;
       }
 
       // Reading status filter
       if (statusFilter !== 'all' && link.reading_status !== statusFilter) {
         return false;
-      }
-
-      // Tags filter (AND semantics)
-      if (selectedTagNames.length > 0) {
-        const linkTagNames = new Set((link.tags || []).map(t => t.name.toLowerCase()));
-        for (const reqTag of selectedTagNames) {
-          if (!linkTagNames.has(reqTag.toLowerCase())) return false;
-        }
       }
 
       // Search query
@@ -92,13 +93,12 @@ export default function LibraryPage() {
         const matchesTitle = link.title?.toLowerCase().includes(q);
         const matchesUrl = link.url.toLowerCase().includes(q);
         const matchesComment = link.comment?.toLowerCase().includes(q);
-        const matchesTags = (link.tags || []).some(t => t.name.toLowerCase().includes(q));
-        if (!matchesTitle && !matchesUrl && !matchesComment && !matchesTags) return false;
+        if (!matchesTitle && !matchesUrl && !matchesComment) return false;
       }
 
       return true;
     });
-  }, [links, selectedFolderId, selectedCategoryId, isUnfiledOnly, statusFilter, selectedTagNames, searchQuery]);
+  }, [links, selectedFolderId, isUnfiledOnly, statusFilter, searchQuery]);
 
   // Multi-select helpers
   const handleToggleSelect = (id: string) => {
@@ -117,17 +117,9 @@ export default function LibraryPage() {
     }
   };
 
-  const toggleTagFilter = (tagName: string) => {
-    if (selectedTagNames.includes(tagName)) {
-      setSelectedTagNames(selectedTagNames.filter(t => t !== tagName));
-    } else {
-      setSelectedTagNames([...selectedTagNames, tagName]);
-    }
-  };
-
   // Drag and drop handler
   const handleDropOnTarget = (
-    target: { type: 'all' | 'unfiled' | 'category' | 'folder'; id?: string },
+    target: { type: 'all' | 'unfiled' | 'folder'; id?: string },
     draggedIds?: string[]
   ) => {
     const idsToMove = (draggedIds && draggedIds.length > 0)
@@ -140,13 +132,9 @@ export default function LibraryPage() {
     if (target.type === 'unfiled' || target.type === 'all') {
       bulkMoveLinks(idsToMove, null, null);
       targetLabel = target.type === 'all' ? 'All Links (Unfiled)' : 'Unfiled';
-    } else if (target.type === 'category' && target.id) {
-      const cat = categories.find(c => c.id === target.id);
-      bulkMoveLinks(idsToMove, target.id, null);
-      targetLabel = cat ? `Category "${cat.name}"` : 'Category';
     } else if (target.type === 'folder' && target.id) {
       const folder = folders.find(f => f.id === target.id);
-      bulkMoveLinks(idsToMove, folder ? folder.category_id : null, target.id);
+      bulkMoveLinks(idsToMove, null, target.id);
       targetLabel = folder ? `Folder "${folder.name}"` : 'Folder';
     }
 
@@ -157,33 +145,24 @@ export default function LibraryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
       <Navbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto pb-24 md:pb-8">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
         {/* Desktop Sidebar */}
         <Sidebar
-          selectedCategoryId={selectedCategoryId}
           selectedFolderId={selectedFolderId}
           isUnfiledOnly={isUnfiledOnly}
           onSelectAll={() => {
-            setSelectedCategoryId(null);
             setSelectedFolderId(null);
             setIsUnfiledOnly(false);
           }}
           onSelectUnfiled={() => {
-            setSelectedCategoryId(null);
             setSelectedFolderId(null);
             setIsUnfiledOnly(true);
           }}
-          onSelectCategory={id => {
-            setSelectedCategoryId(id);
-            setSelectedFolderId(null);
-            setIsUnfiledOnly(false);
-          }}
           onSelectFolder={id => {
             setSelectedFolderId(id);
-            setSelectedCategoryId(null);
             setIsUnfiledOnly(false);
           }}
           onDropOnTarget={handleDropOnTarget}
@@ -194,6 +173,18 @@ export default function LibraryPage() {
           {/* Top Control Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
             <div>
+              {/* Back navigation button if inside a subfolder */}
+              {parentFolder && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedFolderId(parentFolder.id)}
+                  className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1.5 transition-colors"
+                >
+                  <ArrowLeft size={13} />
+                  <span>Back to {parentFolder.name}</span>
+                </button>
+              )}
+
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
                   {activeViewTitle}
@@ -205,10 +196,8 @@ export default function LibraryPage() {
               <p className="text-xs text-zinc-500 mt-1">
                 {selectedFolderId
                   ? 'Viewing items in this folder'
-                  : selectedCategoryId
-                  ? 'Viewing items categorized under this group'
                   : isUnfiledOnly
-                  ? 'Unorganized links without a folder or category'
+                  ? 'Unorganized links without a folder'
                   : 'All links saved across your entire library'}
               </p>
             </div>
@@ -252,7 +241,73 @@ export default function LibraryPage() {
             </div>
           </div>
 
-          {/* Filter Chips Bar (Reading Status & Tags) */}
+          {/* Subfolders Navigation Bar (if active folder has child subfolders) */}
+          {currentFolder && subfolders.length > 0 && (
+            <div className="p-3 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 space-y-2">
+              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <FolderIcon size={13} className="text-amber-400" />
+                <span>Subfolders ({subfolders.length})</span>
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {subfolders.map(sub => {
+                  const subCount = links.filter(l => l.folder_id === sub.id).length;
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => setSelectedFolderId(sub.id)}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-medium border border-zinc-800 hover:border-zinc-700 transition-all group"
+                    >
+                      <FolderIcon size={13} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                      <span>{sub.name}</span>
+                      <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-full font-mono">
+                        {subCount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Matching Folders Search Section */}
+          {matchingFolders.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-2">
+              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <FolderIcon size={13} className="text-amber-400" />
+                <span>Matching Folders ({matchingFolders.length})</span>
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {matchingFolders.map(folder => {
+                  const folderCount = links.filter(l => l.folder_id === folder.id).length;
+                  const isCurrent = selectedFolderId === folder.id;
+                  return (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedFolderId(folder.id);
+                        setIsUnfiledOnly(false);
+                      }}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                        isCurrent
+                          ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700/50 hover:border-amber-500/50'
+                      }`}
+                    >
+                      <FolderIcon size={13} className="text-amber-400" />
+                      <span>{folder.name}</span>
+                      <span className="text-[10px] text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded-full font-mono">
+                        {folderCount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Filter Chips Bar (Reading Status) */}
           <div className="space-y-3">
             {/* Reading Status Filter */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
@@ -277,32 +332,6 @@ export default function LibraryPage() {
                 </button>
               ))}
             </div>
-
-            {/* Tag Filters */}
-            {tags.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                <span className="text-zinc-500 text-[11px] font-semibold uppercase tracking-wider mr-1">Tags:</span>
-                {tags.map(t => {
-                  const isSelected = selectedTagNames.includes(t.name);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => toggleTagFilter(t.name)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-all ${
-                        isSelected
-                          ? 'bg-indigo-600 text-white font-medium shadow-sm'
-                          : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:border-zinc-700'
-                      }`}
-                    >
-                      <TagIcon size={11} className={isSelected ? 'text-white' : 'text-zinc-500'} />
-                      <span>{t.name}</span>
-                      {isSelected && <X size={12} className="ml-0.5 hover:opacity-80" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           {/* Cards Grid */}
