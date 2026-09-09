@@ -466,9 +466,10 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={handleRemoveAvatar}
-                      className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-all"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 border border-zinc-800 text-zinc-300 text-xs font-medium transition-all active:scale-95"
                     >
-                      Remove Photo
+                      <Trash2 size={13} />
+                      <span>Remove Photo</span>
                     </button>
                   )}
                 </div>
@@ -479,18 +480,11 @@ export default function SettingsPage() {
                     Avatar Image URL (Optional)
                   </label>
                   {avatarUrl && avatarUrl.includes('/storage/v1/object/public/avatars/') ? (
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300">
+                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300">
                       <span className="flex items-center gap-2 text-indigo-300 font-medium text-[11px]">
                         <Check size={13} className="text-emerald-400" />
                         Custom photo uploaded from device
                       </span>
-                      <button
-                        type="button"
-                        onClick={handleRemoveAvatar}
-                        className="text-[11px] text-red-400 hover:text-red-300 font-medium transition-colors"
-                      >
-                        Remove
-                      </button>
                     </div>
                   ) : (
                     <input
