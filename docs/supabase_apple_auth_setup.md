@@ -29,12 +29,15 @@ This guide walks you through configuring **Sign in with Apple** on both the **Ap
 5. Click **Continue** and **Register**.
 6. Click on the newly created Services ID to configure it.
 7. Check the box next to **Sign In with Apple**, then click **Configure**:
-   - **Primary App ID**: Select your Linkiac App ID (`eu.linkiac.app`).
-   - **Domains and Subdomains**: Enter your Supabase project domain without `https://` (e.g., `<your-project-ref>.supabase.co`). If you also host your web app on your custom domain (e.g., `linkiac.eu`, `app.linkiac.eu`), include them as well.
-   - **Return URLs**: Enter your Supabase OAuth callback URL:
-     ```text
-     https://<your-project-ref>.supabase.co/auth/v1/callback
-     ```
+    - **Primary App ID**: Select your Linkiac App ID (`eu.linkiac.app`).
+    - **Domains and Subdomains**: Enter your Supabase project domain and web domains (without `https://`):
+      ```text
+      bwyeteqyxvosazuuyiiy.supabase.co, linkiac.eu, app.linkiac.eu
+      ```
+    - **Return URLs**: Enter your exact Supabase OAuth callback URL:
+      ```text
+      https://bwyeteqyxvosazuuyiiy.supabase.co/auth/v1/callback
+      ```
 8. Click **Next** → **Done** → **Save**.
 
 ### Step 2.3: Generate Private Key (`.p8`)
@@ -107,9 +110,14 @@ This guide walks you through configuring **Sign in with Apple** on both the **Ap
 ## 5. Troubleshooting & FAQ
 
 - **Error: "invalid_client" during Web OAuth redirect**:
-  - Verify that the Return URL in Apple Developer Portal (`https://<project-ref>.supabase.co/auth/v1/callback`) matches your Supabase project reference exactly.
+  - Verify that the Return URL in Apple Developer Portal (`https://bwyeteqyxvosazuuyiiy.supabase.co/auth/v1/callback`) matches your Supabase project reference exactly.
   - Verify the `.p8` private key, Key ID, and Team ID in the Supabase Dashboard.
 - **Error: "Token signature is invalid" or "Audience mismatch" on Mobile**:
   - Ensure `eu.linkiac.app` is added to **Authorized Client IDs** in the Supabase Apple provider settings.
+- **Why is `displayName` empty on repeated mobile Apple logins?**:
+  - Apple's privacy policy dictates that the user's `fullName` is **only transmitted on the very first authentication**. Linkiac automatically captures and persists this name into the user's profile on first login.
+  - If you deleted your account during testing and want Apple to resend the name, go to your iPhone **Settings > Apple Account > Sign-In & Security > Sign in with Apple > Linkiac**, tap **Stop using Apple ID**, and then log in again.
+- **EAS Build & Capability Provisioning**:
+  - `apps/mobile/app.json` has `"usesAppleSignIn": true` enabled. When running `eas build`, EAS will automatically provision the Sign in with Apple capability on your Apple Developer certificate and provisioning profile.
 - **Apple Private Relay emails (`...@privaterelay.appleid.com`)**:
   - When users choose "Hide My Email", Apple generates an anonymous private relay address. Supabase handles this seamlessly as the user's primary auth email.
