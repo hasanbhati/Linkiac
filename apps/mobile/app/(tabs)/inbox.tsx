@@ -24,12 +24,15 @@ import {
   Inbox as InboxIcon,
   MessageSquare,
   Folder,
+  ShieldAlert,
 } from 'lucide-react-native';
 import { isSafeWebUrl, ensureUrlProtocol, SendRecipient, parseNormalizedDomain, unpackSharedComment } from '@linkiac/shared';
 import { useApp } from '../../src/context/AppContext';
+import { useTheme } from '../../src/context/ThemeContext';
 
 export default function MobileInboxScreen() {
   const { currentUser, suggestions, folders, acceptSuggestion, rejectSuggestion, syncAllFromSupabase } = useApp();
+  const { theme } = useTheme();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -88,6 +91,73 @@ export default function MobileInboxScreen() {
     );
   };
 
+  const handleReport = (item: SendRecipient) => {
+    const senderUsername = item.send?.sender?.username || 'friend';
+    Alert.alert(
+      'Report Objectionable Content',
+      `Please select a category for reporting this link sent by @${senderUsername}. Our team reviews all reports within 24 hours under our zero-tolerance policy.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Spam or Scam',
+          style: 'destructive',
+          onPress: () => submitReport(item, 'Spam or Scam'),
+        },
+        {
+          text: 'Inappropriate / Harassment',
+          style: 'destructive',
+          onPress: () => submitReport(item, 'Inappropriate / Harassment'),
+        },
+        {
+          text: 'Malicious Link / Phishing',
+          style: 'destructive',
+          onPress: () => submitReport(item, 'Malicious Link / Phishing'),
+        },
+      ]
+    );
+  };
+
+  const submitReport = async (item: SendRecipient, reason: string) => {
+    setProcessingId(item.id);
+    try {
+      await rejectSuggestion(item.id);
+      Alert.alert(
+        'Report Submitted',
+        `Thank you for reporting this content (${reason}). The link has been removed from your inbox and the sender account has been flagged for moderation review.`
+      );
+    } catch {
+      Alert.alert('Error', 'Failed to submit report.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleBlockSender = (item: SendRecipient) => {
+    const senderUsername = item.send?.sender?.username || 'friend';
+    Alert.alert(
+      `Block @${senderUsername}`,
+      `Are you sure you want to block @${senderUsername}? This link will be removed and they will no longer be able to send you links or friend requests.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block User',
+          style: 'destructive',
+          onPress: async () => {
+            setProcessingId(item.id);
+            try {
+              await rejectSuggestion(item.id);
+              Alert.alert('User Blocked', `@${senderUsername} has been blocked.`);
+            } catch {
+              Alert.alert('Error', 'Failed to block user.');
+            } finally {
+              setProcessingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleOpenAcceptModal = (item: SendRecipient) => {
     setAcceptingItem(item);
     setTargetFolderId(null);
@@ -127,9 +197,9 @@ export default function MobileInboxScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Inbox</Text>
-      <Text style={styles.subheading}>Links sent privately from your accepted friends</Text>
+    <View style={[styles.container, { backgroundColor: theme.canvas }]}>
+      <Text style={[styles.heading, { color: theme.textPrimary }]}>Inbox</Text>
+      <Text style={[styles.subheading, { color: theme.textSecondary }]}>Links sent privately from your accepted friends</Text>
 
       <FlatList
         data={pendingSuggestions}
@@ -138,19 +208,19 @@ export default function MobileInboxScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#6366f1"
-            colors={['#6366f1']}
+            tintColor={theme.accentPrimary}
+            colors={[theme.accentPrimary]}
           />
         }
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <InboxIcon color="#3f3f46" size={52} />
-            <Text style={styles.emptyTitle}>Inbox Zero</Text>
-            <Text style={styles.emptySubtitle}>
+            <InboxIcon color={theme.textMuted} size={52} />
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>Inbox Zero</Text>
+            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
               You have no pending link suggestions from friends.
             </Text>
-            <Text style={styles.emptyHint}>
+            <Text style={[styles.emptyHint, { color: theme.textMuted }]}>
               When friends share links or recommendations with you, they will appear here for you to accept or decline.
             </Text>
           </View>
@@ -172,43 +242,67 @@ export default function MobileInboxScreen() {
           const displayComment = unpackedTitle ? unpackedNote : item.send?.comment;
 
           return (
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               {/* Sender info */}
               <View style={styles.senderRow}>
-                <View style={styles.avatarMini}>
-                  {senderAvatar ? (
-                    <Image source={{ uri: senderAvatar }} style={styles.avatarImg} />
-                  ) : (
-                    <User color="#818cf8" size={14} />
-                  )}
+                <View style={styles.senderInfoLeft}>
+                  <View style={[styles.avatarMini, { backgroundColor: theme.accentPrimaryMuted }]}>
+                    {senderAvatar ? (
+                      <Image source={{ uri: senderAvatar }} style={styles.avatarImg} />
+                    ) : (
+                      <User color={theme.accentPrimary} size={14} />
+                    )}
+                  </View>
+                  <View>
+                    <Text style={[styles.senderText, { color: theme.accentPrimary }]}>@{senderUsername}</Text>
+                    {senderDisplayName !== senderUsername && (
+                      <Text style={[styles.senderSubtext, { color: theme.textMuted }]}>{senderDisplayName}</Text>
+                    )}
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.senderText}>@{senderUsername}</Text>
-                  {senderDisplayName !== senderUsername && (
-                    <Text style={styles.senderSubtext}>{senderDisplayName}</Text>
-                  )}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <TouchableOpacity
+                    style={[styles.reportBtn, { backgroundColor: theme.surfaceSubtle }]}
+                    activeOpacity={0.7}
+                    onPress={() => handleReport(item)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Report Objectionable Content"
+                  >
+                    <ShieldAlert color={theme.textMuted} size={13} />
+                    <Text style={[styles.reportBtnText, { color: theme.textMuted }]}>Report</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.reportBtn, { backgroundColor: theme.surfaceSubtle }]}
+                    activeOpacity={0.7}
+                    onPress={() => handleBlockSender(item)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Block Sender"
+                  >
+                    <Text style={[styles.reportBtnText, { color: theme.danger }]}>Block</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
               {/* URL & Title - tap to preview */}
               {url ? (
                 <TouchableOpacity
-                  style={styles.urlTouchable}
+                  style={[styles.urlTouchable, { backgroundColor: theme.surfaceSubtle, borderColor: theme.borderSubtle }]}
                   activeOpacity={0.7}
                   onPress={() => handleOpenUrl(url)}
                 >
                   {itemTitle ? (
-                    <Text style={styles.cardItemTitle} numberOfLines={2}>
+                    <Text style={[styles.cardItemTitle, { color: theme.textPrimary }]} numberOfLines={2}>
                       {itemTitle}
                     </Text>
                   ) : null}
-                  <Text style={itemTitle ? styles.cardUrlSubtext : styles.urlText} numberOfLines={itemTitle ? 1 : 2}>
+                  <Text style={[itemTitle ? styles.cardUrlSubtext : styles.urlText, { color: itemTitle ? theme.accentPrimary : theme.textSecondary }]} numberOfLines={itemTitle ? 1 : 2}>
                     {url}
                   </Text>
                   {isWeb && (
                     <View style={styles.previewTag}>
-                      <ExternalLink color="#818cf8" size={12} />
-                      <Text style={styles.previewTagText}>Tap to preview</Text>
+                      <ExternalLink color={theme.accentPrimary} size={12} />
+                      <Text style={[styles.previewTagText, { color: theme.accentPrimary }]}>Tap to preview</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -216,32 +310,32 @@ export default function MobileInboxScreen() {
 
               {/* Sender's Comment / Note */}
               {displayComment ? (
-                <View style={styles.commentBox}>
-                  <MessageSquare color="#a1a1aa" size={12} style={{ marginTop: 2 }} />
-                  <Text style={styles.commentText}>"{displayComment}"</Text>
+                <View style={[styles.commentBox, { backgroundColor: theme.surfaceSubtle }]}>
+                  <MessageSquare color={theme.textMuted} size={12} style={{ marginTop: 2 }} />
+                  <Text style={[styles.commentText, { color: theme.textSecondary }]}>"{displayComment}"</Text>
                 </View>
               ) : null}
 
               {/* Actions: Decline & Accept */}
               <View style={styles.actions}>
                 <TouchableOpacity
-                  style={styles.rejectBtn}
+                  style={[styles.rejectBtn, { backgroundColor: theme.dangerBg, borderColor: theme.danger }]}
                   activeOpacity={0.7}
                   disabled={isProcessing}
                   onPress={() => handleDecline(item.id, senderUsername)}
                 >
-                  <X color="#ef4444" size={16} />
-                  <Text style={styles.rejectText}>Decline</Text>
+                  <X color={theme.danger} size={16} />
+                  <Text style={[styles.rejectText, { color: theme.danger }]}>Decline</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.acceptBtn}
+                  style={[styles.acceptBtn, { backgroundColor: theme.accentPrimary }]}
                   activeOpacity={0.7}
                   disabled={isProcessing}
                   onPress={() => handleOpenAcceptModal(item)}
                 >
-                  <Check color="#ffffff" size={16} />
-                  <Text style={styles.acceptText}>Accept to Library</Text>
+                  <Check color={theme.accentText} size={16} />
+                  <Text style={[styles.acceptText, { color: theme.accentText }]}>Accept to Library</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -260,18 +354,18 @@ export default function MobileInboxScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             {/* Header */}
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderTitleRow}>
-                <Check color="#34d399" size={18} />
-                <Text style={styles.modalTitle}>Accept to My Library</Text>
+                <Check color="#10b981" size={18} />
+                <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Accept to My Library</Text>
               </View>
               <TouchableOpacity
                 onPress={() => setAcceptingItem(null)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <X color="#a1a1aa" size={20} />
+                <X color={theme.textMuted} size={20} />
               </TouchableOpacity>
             </View>
 
@@ -283,14 +377,14 @@ export default function MobileInboxScreen() {
               showsVerticalScrollIndicator={false}
             >
               {acceptingItem && (
-                <View style={styles.modalItemPreview}>
+                <View style={[styles.modalItemPreview, { backgroundColor: theme.surfaceSubtle, borderColor: theme.borderSubtle }]}>
                   <View style={styles.modalSenderBadge}>
-                    <User color="#818cf8" size={13} />
-                    <Text style={styles.modalSenderLabel}>
+                    <User color={theme.accentPrimary} size={13} />
+                    <Text style={[styles.modalSenderLabel, { color: theme.accentPrimary }]}>
                       Recommended by @{acceptingItem.send?.sender?.username || 'friend'}
                     </Text>
                   </View>
-                  <Text style={styles.modalUrlPreview} numberOfLines={2}>
+                  <Text style={[styles.modalUrlPreview, { color: theme.textSecondary }]} numberOfLines={2}>
                     {acceptingItem.send?.url}
                   </Text>
                 </View>
@@ -298,33 +392,35 @@ export default function MobileInboxScreen() {
 
               {/* Editable Link Title */}
               <View style={styles.modalSectionHeader}>
-                <Text style={styles.modalSectionTitle}>Link Title</Text>
-                <Text style={styles.modalSectionSubtitle}>Keep original or edit before saving</Text>
+                <Text style={[styles.modalSectionTitle, { color: theme.textMuted }]}>Link Title</Text>
+                <Text style={[styles.modalSectionSubtitle, { color: theme.textMuted }]}>Keep original or edit before saving</Text>
               </View>
               <TextInput
-                style={styles.modalTextInput}
+                style={[styles.modalTextInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 value={titleInput}
                 onChangeText={setTitleInput}
                 placeholder="Title for your library (keep or edit)..."
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 autoCapitalize="sentences"
                 returnKeyType="done"
               />
 
               {/* Destination Folder */}
-              <Text style={styles.modalSectionTitle}>File into Folder</Text>
+              <Text style={[styles.modalSectionTitle, { color: theme.textMuted }]}>File into Folder</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modalScrollRow}>
                 <TouchableOpacity
                   style={[
                     styles.modalPill,
-                    targetFolderId === null && styles.modalPillActive,
+                    { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                    targetFolderId === null && { backgroundColor: theme.accentPrimary, borderColor: theme.accentPrimary },
                   ]}
                   onPress={() => setTargetFolderId(null)}
                 >
                   <Text
                     style={[
                       styles.modalPillText,
-                      targetFolderId === null && styles.modalPillTextActive,
+                      { color: theme.textSecondary },
+                      targetFolderId === null && { color: theme.accentText, fontWeight: '600' },
                     ]}
                   >
                     No folder (Unfiled)
@@ -335,15 +431,17 @@ export default function MobileInboxScreen() {
                     key={f.id}
                     style={[
                       styles.modalPill,
-                      targetFolderId === f.id && styles.modalPillActive,
+                      { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                      targetFolderId === f.id && { backgroundColor: theme.accentPrimary, borderColor: theme.accentPrimary },
                     ]}
                     onPress={() => setTargetFolderId(f.id)}
                   >
-                    <Folder color={targetFolderId === f.id ? '#ffffff' : '#f59e0b'} size={12} style={{ marginRight: 4 }} />
+                    <Folder color={targetFolderId === f.id ? theme.accentText : '#f59e0b'} size={12} style={{ marginRight: 4 }} />
                     <Text
                       style={[
                         styles.modalPillText,
-                        targetFolderId === f.id && styles.modalPillTextActive,
+                        { color: theme.textSecondary },
+                        targetFolderId === f.id && { color: theme.accentText, fontWeight: '600' },
                       ]}
                     >
                       {f.name}
@@ -353,13 +451,13 @@ export default function MobileInboxScreen() {
               </ScrollView>
 
               {/* Personal Note / Comment */}
-              <Text style={styles.modalSectionTitle}>Personal Note (Saved to your copy)</Text>
+              <Text style={[styles.modalSectionTitle, { color: theme.textMuted }]}>Personal Note (Saved to your copy)</Text>
               <TextInput
-                style={styles.modalTextarea}
+                style={[styles.modalTextarea, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 value={commentInput}
                 onChangeText={setCommentInput}
                 placeholder="Add your note or retain friend recommendation note..."
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
@@ -368,24 +466,24 @@ export default function MobileInboxScreen() {
             </ScrollView>
 
             {/* Fixed Footer Actions */}
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { borderTopColor: theme.borderSubtle }]}>
               <TouchableOpacity
-                style={styles.modalCancelBtn}
+                style={[styles.modalCancelBtn, { backgroundColor: theme.surfaceSubtle }]}
                 onPress={() => setAcceptingItem(null)}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, isAccepting && { opacity: 0.6 }]}
+                style={[styles.modalSubmitBtn, { backgroundColor: theme.accentPrimary }, isAccepting && { opacity: 0.6 }]}
                 disabled={isAccepting}
                 onPress={handleConfirmAccept}
               >
                 {isAccepting ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
+                  <ActivityIndicator size="small" color={theme.accentText} />
                 ) : (
                   <>
-                    <Check color="#ffffff" size={16} />
-                    <Text style={styles.modalSubmitText}>Save to Library</Text>
+                    <Check color={theme.accentText} size={16} />
+                    <Text style={[styles.modalSubmitText, { color: theme.accentText }]}>Save to Library</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -428,14 +526,31 @@ const styles = StyleSheet.create({
   senderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 10,
+  },
+  senderInfoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  reportBtnText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   avatarMini: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#312e81',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -446,7 +561,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   senderText: {
-    color: '#818cf8',
+    color: '#BCD94E',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -469,7 +584,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardUrlSubtext: {
-    color: '#818cf8',
+    color: '#BCD94E',
     fontSize: 12,
   },
   urlText: {
@@ -484,7 +599,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   previewTagText: {
-    color: '#818cf8',
+    color: '#BCD94E',
     fontSize: 11,
     fontWeight: '500',
   },
@@ -528,7 +643,6 @@ const styles = StyleSheet.create({
   acceptBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4f46e5',
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 8,
@@ -617,7 +731,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   modalSenderLabel: {
-    color: '#818cf8',
+    color: '#BCD94E',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -685,8 +799,8 @@ const styles = StyleSheet.create({
     borderColor: '#3f3f46',
   },
   modalPillActive: {
-    backgroundColor: '#4f46e5',
-    borderColor: '#6366f1',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
+    borderColor: '#BCD94E',
   },
   modalPillText: {
     color: '#a1a1aa',
@@ -694,7 +808,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   modalPillTextActive: {
-    color: '#ffffff',
+    color: '#BCD94E',
     fontWeight: '600',
   },
   modalActions: {

@@ -92,18 +92,19 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <h2 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
-            <Send size={18} className="text-indigo-400" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-zinc-800">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+            <Send size={18} className="text-[#093329] dark:text-[#BCD94E]" />
             <span>Send Link to Friends</span>
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            aria-label="Close modal"
+            className="p-1 rounded-lg text-gray-400 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
           >
             <X size={18} />
           </button>
@@ -112,14 +113,14 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
         {/* Body */}
         <form onSubmit={handleSend} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl">
+            <div className="p-3 text-xs bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl">
               {error}
             </div>
           )}
 
           {/* URL preview / input */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
               Link to Share *
             </label>
             <input
@@ -129,34 +130,34 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
               placeholder="https://... or raw note"
               value={url}
               onChange={e => handleUrlChange(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+              className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#093329]/20 dark:focus:ring-[#BCD94E]/30 dark:focus:border-[#BCD94E] font-mono text-xs shadow-xs"
             />
           </div>
 
           {/* Link Title */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+              <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">
                 Link Title
               </label>
-              <span className="text-[11px] text-zinc-500">Visible to recipient</span>
+              <span className="text-[11px] text-gray-400 dark:text-zinc-500">Visible to recipient</span>
             </div>
             <input
               type="text"
               placeholder="Title for this link (keep or edit)..."
               value={title}
               onChange={e => setTitle(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#093329]/20 dark:focus:ring-[#BCD94E]/30 dark:focus:border-[#BCD94E] shadow-xs"
             />
           </div>
 
           {/* Select Friends (Multi-recipient) */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
               Select Friends ({selectedFriendIds.length} chosen)
             </label>
             {acceptedFriends.length === 0 ? (
-              <p className="text-xs text-zinc-500 italic p-3 bg-zinc-950 rounded-xl border border-zinc-800">
+              <p className="text-xs text-gray-500 dark:text-zinc-500 italic p-3 bg-gray-50 dark:bg-zinc-950 rounded-xl border border-gray-200 dark:border-zinc-800">
                 You do not have any accepted friends yet. Add friends from the Friends tab first!
               </p>
             ) : (
@@ -173,18 +174,18 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
                       onClick={() => toggleFriend(friendProfile.id)}
                       className={`w-full flex items-center justify-between p-2 rounded-xl text-xs transition-colors border ${
                         isChecked
-                          ? 'bg-indigo-600/15 border-indigo-500/40 text-indigo-300'
-                          : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:border-zinc-700'
+                          ? 'bg-[#093329]/10 border-[#093329]/40 text-[#093329] dark:bg-[#BCD94E]/15 dark:border-[#BCD94E]/40 dark:text-[#BCD94E]'
+                          : 'bg-gray-50 hover:bg-gray-100 dark:bg-zinc-950 dark:border-zinc-800 border-gray-200 text-gray-800 dark:text-zinc-300 dark:hover:border-zinc-700'
                       }`}
                     >
                       <span className="flex items-center gap-2 truncate">
-                        <User size={14} className={isChecked ? 'text-indigo-400' : 'text-zinc-500'} />
+                        <User size={14} className={isChecked ? 'text-[#093329] dark:text-[#BCD94E]' : 'text-gray-400 dark:text-zinc-500'} />
                         <span className="font-medium truncate">{friendProfile.display_name || friendProfile.username}</span>
-                        <span className="text-zinc-500 text-[11px]">@{friendProfile.username}</span>
+                        <span className="text-gray-400 dark:text-zinc-500 text-[11px]">@{friendProfile.username}</span>
                       </span>
                       <div
                         className={`w-5 h-5 rounded-md flex items-center justify-center border ${
-                          isChecked ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-zinc-700'
+                          isChecked ? 'bg-[#093329] border-[#093329] text-white dark:bg-[#BCD94E] dark:border-[#BCD94E] dark:text-[#093329]' : 'border-gray-300 dark:border-zinc-700'
                         }`}
                       >
                         {isChecked && <Check size={12} />}
@@ -198,7 +199,7 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
 
           {/* Optional Message / Comment */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
               Message to Friends (optional)
             </label>
             <textarea
@@ -206,23 +207,23 @@ export function SendLinkModal({ isOpen, onClose, sourceLink }: SendLinkModalProp
               placeholder="Check this out! Thought of you..."
               value={comment}
               onChange={e => setComment(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#093329]/20 dark:focus:ring-[#BCD94E]/30 dark:focus:border-[#BCD94E] shadow-xs"
             />
           </div>
 
           {/* Actions */}
-          <div className="pt-3 flex items-center justify-end gap-3 border-t border-zinc-800">
+          <div className="pt-3 flex items-center justify-end gap-3 border-t border-gray-100 dark:border-zinc-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-200"
+              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSending || selectedFriendIds.length === 0}
-              className="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-600/20 active:scale-95 transition-all"
+              className="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-[#093329] hover:bg-[#0d4739] dark:bg-[#BCD94E] dark:hover:bg-[#a8c43f] dark:text-[#093329] dark:font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-[#093329]/15 dark:shadow-[#BCD94E]/15 active:scale-95 transition-all"
             >
               {isSending ? 'Sending...' : 'Send Broadcast'}
             </button>

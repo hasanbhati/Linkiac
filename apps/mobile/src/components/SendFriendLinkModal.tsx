@@ -14,6 +14,7 @@ import {
 import { X, Send, User } from 'lucide-react-native';
 import { Friendship, parseNormalizedDomain } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface SendFriendLinkModalProps {
   visible: boolean;
@@ -27,6 +28,7 @@ export function SendFriendLinkModal({
   onClose,
 }: SendFriendLinkModalProps) {
   const { currentUser, sendLinkToFriend } = useApp();
+  const { theme, isDark } = useTheme();
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
@@ -92,36 +94,36 @@ export function SendFriendLinkModal({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
       >
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.headerLeft}>
-              <Send color="#6366f1" size={18} />
-              <Text style={styles.headerTitle}>Send Link to @{friendUsername}</Text>
+              <Send color={theme.accentPrimary} size={18} />
+              <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Send Link to @{friendUsername}</Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <X color="#a1a1aa" size={20} />
+              <X color={theme.textMuted} size={20} />
             </TouchableOpacity>
           </View>
 
           {/* Form */}
           <View style={styles.body}>
-            <View style={styles.recipientBadge}>
-              <User color="#818cf8" size={14} />
-              <Text style={styles.recipientText}>
+            <View style={[styles.recipientBadge, { backgroundColor: theme.accentPrimaryMuted, borderColor: theme.border }]}>
+              <User color={theme.accentPrimary} size={14} />
+              <Text style={[styles.recipientText, { color: theme.accentPrimary }]}>
                 Recipient: {friendDisplayName} (@{friendUsername})
               </Text>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>URL or Content to Share *</Text>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>URL or Content to Share *</Text>
               <TextInput
-                style={[styles.input, styles.multilineInput]}
+                style={[styles.input, styles.multilineInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 placeholder="https://example.com/article, or any idea note"
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 value={url}
                 onChangeText={handleUrlChange}
                 multiline
@@ -132,13 +134,13 @@ export function SendFriendLinkModal({
 
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Link Title (Optional)</Text>
-                <Text style={styles.subLabel}>Visible to recipient</Text>
+                <Text style={[styles.label, { color: theme.textPrimary }]}>Link Title (Optional)</Text>
+                <Text style={[styles.subLabel, { color: theme.textMuted }]}>Visible to recipient</Text>
               </View>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 placeholder="Title for this link (e.g. Job Offer)..."
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 value={title}
                 onChangeText={setTitle}
                 autoCapitalize="sentences"
@@ -147,11 +149,11 @@ export function SendFriendLinkModal({
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Personal Message (Optional)</Text>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>Personal Message (Optional)</Text>
               <TextInput
-                style={[styles.input, styles.commentInput]}
+                style={[styles.input, styles.commentInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 placeholder="Why are you recommending this link?"
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 value={comment}
                 onChangeText={setComment}
                 multiline
@@ -162,26 +164,26 @@ export function SendFriendLinkModal({
           </View>
 
           {/* Footer */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { borderTopColor: theme.border }]}>
             <TouchableOpacity
               onPress={onClose}
-              style={styles.cancelBtn}
+              style={[styles.cancelBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
               disabled={isSending}
             >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleSend}
-              style={styles.sendBtn}
+              style={[styles.sendBtn, { backgroundColor: theme.accentPrimary }]}
               disabled={isSending}
             >
               {isSending ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color={theme.accentText} />
               ) : (
                 <>
-                  <Send color="#ffffff" size={15} />
-                  <Text style={styles.sendBtnText}>Send to Friend</Text>
+                  <Send color={theme.accentText} size={15} />
+                  <Text style={[styles.sendBtnText, { color: theme.accentText }]}>Send to Friend</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -232,16 +234,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#1e1b4b',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#3730a3',
   },
   recipientText: {
-    color: '#c7d2fe',
     fontSize: 13,
     fontWeight: '500',
   },
@@ -310,7 +309,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#4f46e5',
     borderRadius: 10,
   },
   sendBtnText: {

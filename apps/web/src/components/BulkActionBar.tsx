@@ -46,10 +46,10 @@ export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarPr
 
   return (
     <>
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-900/95 backdrop-blur-md border border-zinc-700/80 rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-4 text-xs animate-slide-up">
-        <div className="flex items-center gap-2 border-r border-zinc-800 pr-4">
-          <CheckSquare size={16} className="text-indigo-400" />
-          <span className="font-semibold text-zinc-100 whitespace-nowrap">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-gray-200 dark:border-zinc-700/80 rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-4 text-xs animate-slide-up">
+        <div className="flex items-center gap-2 border-r border-gray-200 dark:border-zinc-800 pr-4">
+          <CheckSquare size={16} className="text-[#093329] dark:text-[#BCD94E]" />
+          <span className="font-semibold text-gray-900 dark:text-zinc-100 whitespace-nowrap">
             {selectedIds.length} {selectedIds.length === 1 ? 'link' : 'links'} selected
           </span>
         </div>
@@ -58,16 +58,16 @@ export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarPr
           <button
             type="button"
             onClick={() => setShowMoveDialog(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-zinc-200 font-medium transition-colors shadow-xs"
           >
-            <FolderInput size={14} className="text-amber-400" />
+            <FolderInput size={14} className="text-amber-500" />
             <span>Move</span>
           </button>
 
           <button
             type="button"
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 dark:bg-red-500/10 dark:hover:bg-red-500/20 dark:text-red-400 dark:border-red-500/20 font-medium transition-colors"
           >
             <Trash2 size={14} />
             <span>Delete</span>
@@ -77,7 +77,8 @@ export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarPr
         <button
           type="button"
           onClick={onClearSelection}
-          className="p-1 text-zinc-500 hover:text-zinc-200 rounded-lg"
+          className="p-1 text-gray-400 hover:text-gray-700 dark:text-zinc-500 dark:hover:text-zinc-200 rounded-lg transition-colors"
+          aria-label="Deselect all"
           title="Deselect all"
         >
           <X size={16} />
@@ -86,26 +87,26 @@ export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarPr
 
       {/* Bulk Move Dialog */}
       {showMoveDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
-            <h3 className="font-semibold text-zinc-100 text-sm">Move {selectedIds.length} links to...</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-5 space-y-4 shadow-2xl">
+            <h3 className="font-semibold text-gray-900 dark:text-zinc-100 text-sm">Move {selectedIds.length} links to...</h3>
             <CustomSelect
               value={selectedFolderId || 'none'}
               onChange={val => setSelectedFolderId(val === 'none' ? null : val)}
               options={folderOptions}
             />
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={() => setShowMoveDialog(false)}
-                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+                className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 rounded-xl transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleBulkMove}
-                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-xs"
+                className="px-4 py-1.5 bg-[#093329] hover:bg-[#0d4739] dark:bg-[#BCD94E] dark:hover:bg-[#a8c43f] text-white dark:text-[#093329] font-medium dark:font-bold rounded-xl text-xs shadow-md shadow-[#093329]/15 dark:shadow-[#BCD94E]/15 active:scale-95 transition-all"
               >
                 Apply Move
               </button>

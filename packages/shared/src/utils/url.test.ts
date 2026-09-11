@@ -16,6 +16,9 @@ describe('parseNormalizedDomain', () => {
 
   it('handles subdomains and ports', () => {
     expect(parseNormalizedDomain('https://app.dev.linkiac.com:3000/dashboard')).toBe('app.dev.linkiac.com');
+    expect(parseNormalizedDomain('https://linkiac.eu')).toBe('linkiac.eu');
+    expect(parseNormalizedDomain('https://www.linkiac.eu/library')).toBe('linkiac.eu');
+    expect(parseNormalizedDomain('https://app.linkiac.eu:3000/library')).toBe('app.linkiac.eu');
   });
 
   it('returns null for arbitrary non-URL text', () => {

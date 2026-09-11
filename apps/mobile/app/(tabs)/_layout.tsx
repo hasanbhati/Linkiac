@@ -3,11 +3,13 @@ import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bookmark, Inbox, Users, BarChart3, Settings } from 'lucide-react-native';
 import { useApp } from '../../src/context/AppContext';
+import { useTheme } from '../../src/context/ThemeContext';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 4);
   const { suggestions, friends, currentUser } = useApp();
+  const { theme } = useTheme();
 
   const inboxBadgeCount = suggestions.filter(
     s => s.status === 'pending' && s.recipient_id === currentUser.id
@@ -19,18 +21,18 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: '#09090b' },
-        headerTintColor: '#fafafa',
+        headerStyle: { backgroundColor: theme.surface },
+        headerTintColor: theme.textPrimary,
         headerTitleStyle: { fontWeight: '700' },
         tabBarStyle: {
-          backgroundColor: '#09090b',
-          borderTopColor: '#27272a',
+          backgroundColor: theme.tabBarBg,
+          borderTopColor: theme.tabBarBorder,
           height: 52 + bottomInset,
           paddingBottom: bottomInset,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: '#6366f1',
-        tabBarInactiveTintColor: '#71717a',
+        tabBarActiveTintColor: theme.tabBarActive,
+        tabBarInactiveTintColor: theme.tabBarInactive,
       }}
     >
       <Tabs.Screen
@@ -47,8 +49,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <Inbox color={color} size={size} />,
           tabBarBadge: inboxBadgeCount > 0 ? inboxBadgeCount : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: '#6366f1',
-            color: '#ffffff',
+            backgroundColor: theme.accentPrimary,
+            color: theme.accentText,
             fontSize: 10,
             fontWeight: '700',
           },
@@ -61,8 +63,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
           tabBarBadge: friendsBadgeCount > 0 ? friendsBadgeCount : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: '#6366f1',
-            color: '#ffffff',
+            backgroundColor: theme.accentPrimary,
+            color: theme.accentText,
             fontSize: 10,
             fontWeight: '700',
           },

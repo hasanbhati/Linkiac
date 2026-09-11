@@ -14,12 +14,14 @@ import {
 import { UserCheck, UserPlus, Search, Users, ChevronRight, User, Check, Sparkles } from 'lucide-react-native';
 import { Friendship, Profile } from '@linkiac/shared';
 import { useApp } from '../../src/context/AppContext';
+import { useTheme } from '../../src/context/ThemeContext';
 import { FriendDetailModal } from '../../src/components/FriendDetailModal';
 import { SendFriendLinkModal } from '../../src/components/SendFriendLinkModal';
 import { supabase } from '../../lib/supabase';
 
 export default function MobileFriendsScreen() {
   const { currentUser, friends, acceptFriendRequest, syncAllFromSupabase } = useApp();
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<'my_friends' | 'discover'>('my_friends');
   const [query, setQuery] = useState('');
   const [selectedFriendship, setSelectedFriendship] = useState<Friendship | null>(null);
@@ -143,30 +145,48 @@ export default function MobileFriendsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Friends & Sharing</Text>
-      <Text style={styles.subheading}>Connect with curators and exchange private recommendations</Text>
+    <View style={[styles.container, { backgroundColor: theme.canvas }]}>
+      <Text style={[styles.heading, { color: theme.textPrimary }]}>Friends & Sharing</Text>
+      <Text style={[styles.subheading, { color: theme.textSecondary }]}>Connect with curators and exchange private recommendations</Text>
 
       {/* Segmented Control */}
-      <View style={styles.segmentContainer}>
+      <View style={[styles.segmentContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <TouchableOpacity
-          style={[styles.segmentBtn, activeTab === 'my_friends' && styles.segmentBtnActive]}
+          style={[
+            styles.segmentBtn,
+            activeTab === 'my_friends' && { backgroundColor: theme.accentPrimary },
+          ]}
           activeOpacity={0.8}
           onPress={() => setActiveTab('my_friends')}
         >
-          <Users color={activeTab === 'my_friends' ? '#ffffff' : '#a1a1aa'} size={15} />
-          <Text style={[styles.segmentText, activeTab === 'my_friends' && styles.segmentTextActive]}>
+          <Users color={activeTab === 'my_friends' ? theme.accentText : theme.textMuted} size={15} />
+          <Text
+            style={[
+              styles.segmentText,
+              { color: theme.textSecondary },
+              activeTab === 'my_friends' && { color: theme.accentText, fontWeight: '700' },
+            ]}
+          >
             My Friends ({friends.filter(f => f.status === 'accepted').length})
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.segmentBtn, activeTab === 'discover' && styles.segmentBtnActive]}
+          style={[
+            styles.segmentBtn,
+            activeTab === 'discover' && { backgroundColor: theme.accentPrimary },
+          ]}
           activeOpacity={0.8}
           onPress={() => setActiveTab('discover')}
         >
-          <Sparkles color={activeTab === 'discover' ? '#ffffff' : '#a1a1aa'} size={15} />
-          <Text style={[styles.segmentText, activeTab === 'discover' && styles.segmentTextActive]}>
+          <Sparkles color={activeTab === 'discover' ? theme.accentText : theme.textMuted} size={15} />
+          <Text
+            style={[
+              styles.segmentText,
+              { color: theme.textSecondary },
+              activeTab === 'discover' && { color: theme.accentText, fontWeight: '700' },
+            ]}
+          >
             Find People
           </Text>
         </TouchableOpacity>
@@ -175,18 +195,18 @@ export default function MobileFriendsScreen() {
       {activeTab === 'my_friends' ? (
         <>
           {/* Search Input */}
-          <View style={styles.searchBox}>
-            <Search color="#71717a" size={16} />
+          <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Search color={theme.textMuted} size={16} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: theme.textPrimary }]}
               placeholder="Filter my friends by username or name..."
-              placeholderTextColor="#71717a"
+              placeholderTextColor={theme.textMuted}
               value={query}
               onChangeText={setQuery}
             />
             {query ? (
               <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={styles.clearText}>Clear</Text>
+                <Text style={[styles.clearText, { color: theme.textMuted }]}>Clear</Text>
               </TouchableOpacity>
             ) : null}
           </View>
@@ -198,29 +218,29 @@ export default function MobileFriendsScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#6366f1"
-                colors={['#6366f1']}
+                tintColor={theme.accentPrimary}
+                colors={[theme.accentPrimary]}
               />
             }
             contentContainerStyle={styles.list}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Users color="#3f3f46" size={48} />
-                <Text style={styles.emptyTitle}>
+                <Users color={theme.textMuted} size={48} />
+                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
                   {query ? 'No friends found' : 'No friends connected yet'}
                 </Text>
-                <Text style={styles.emptySubtitle}>
+                <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
                   {query
                     ? `No one matching "${query}".`
                     : 'Tap "Find People" above to search and connect with other Linkiac curators.'}
                 </Text>
                 {!query && (
                   <TouchableOpacity
-                    style={styles.findPeopleCta}
+                    style={[styles.findPeopleCta, { backgroundColor: theme.accentPrimary }]}
                     onPress={() => setActiveTab('discover')}
                   >
-                    <UserPlus color="#ffffff" size={16} />
-                    <Text style={styles.findPeopleCtaText}>Discover & Add Friends</Text>
+                    <UserPlus color={theme.accentText} size={16} />
+                    <Text style={[styles.findPeopleCtaText, { color: theme.accentText }]}>Discover & Add Friends</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -234,48 +254,48 @@ export default function MobileFriendsScreen() {
 
               return (
                 <TouchableOpacity
-                  style={styles.item}
+                  style={[styles.item, { backgroundColor: theme.surface, borderColor: theme.border }]}
                   activeOpacity={0.7}
                   onPress={() => setSelectedFriendship(item)}
                 >
                   <View style={styles.itemLeft}>
-                    <View style={[styles.avatarMini, isAccepted ? styles.avatarAccepted : styles.avatarPending]}>
+                    <View style={[styles.avatarMini, isAccepted ? { backgroundColor: theme.accentPrimaryMuted } : { backgroundColor: theme.surfaceSubtle }]}>
                       {other?.avatar_url ? (
                         <Image source={{ uri: other.avatar_url }} style={styles.avatarImg} />
                       ) : (
-                        <User color="#ffffff" size={16} />
+                        <User color={theme.accentPrimary} size={16} />
                       )}
                     </View>
                     <View>
-                      <Text style={styles.username}>@{username}</Text>
-                      <Text style={styles.name}>{displayName}</Text>
+                      <Text style={[styles.username, { color: theme.textPrimary }]}>@{username}</Text>
+                      <Text style={[styles.name, { color: theme.textMuted }]}>{displayName}</Text>
                     </View>
                   </View>
 
                   <View style={styles.itemRight}>
                     {isAccepted ? (
-                      <View style={styles.badgeAccepted}>
+                      <View style={[styles.badgeAccepted, { backgroundColor: '#064e3b' }]}>
                         <UserCheck color="#34d399" size={14} />
                         <Text style={styles.badgeTextAccepted}>Friends</Text>
                       </View>
                     ) : isIncoming ? (
                       <TouchableOpacity
-                        style={styles.badgePending}
+                        style={[styles.badgePending, { backgroundColor: theme.accentPrimary }]}
                         activeOpacity={0.7}
                         onPress={e => {
                           e.stopPropagation();
                           handleAccept(item.id, username);
                         }}
                       >
-                        <UserPlus color="#ffffff" size={14} />
-                        <Text style={styles.badgeTextPending}>Accept</Text>
+                        <UserPlus color={theme.accentText} size={14} />
+                        <Text style={[styles.badgeTextPending, { color: theme.accentText }]}>Accept</Text>
                       </TouchableOpacity>
                     ) : (
-                      <View style={styles.badgePendingSent}>
-                        <Text style={styles.badgeTextPendingSent}>Pending</Text>
+                      <View style={[styles.badgePendingSent, { backgroundColor: theme.surfaceSubtle }]}>
+                        <Text style={[styles.badgeTextPendingSent, { color: theme.textMuted }]}>Pending</Text>
                       </View>
                     )}
-                    <ChevronRight color="#52525b" size={16} style={{ marginLeft: 6 }} />
+                    <ChevronRight color={theme.textMuted} size={16} style={{ marginLeft: 6 }} />
                   </View>
                 </TouchableOpacity>
               );
@@ -285,12 +305,12 @@ export default function MobileFriendsScreen() {
       ) : (
         <>
           {/* Search Bar for Discovering Users */}
-          <View style={styles.searchBox}>
-            <Search color="#71717a" size={16} />
+          <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Search color={theme.textMuted} size={16} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: theme.textPrimary }]}
               placeholder="Search by username or name (e.g. alex_curator)..."
-              placeholderTextColor="#71717a"
+              placeholderTextColor={theme.textMuted}
               value={discoverQuery}
               onChangeText={setDiscoverQuery}
               autoCapitalize="none"
@@ -298,15 +318,15 @@ export default function MobileFriendsScreen() {
             />
             {discoverQuery ? (
               <TouchableOpacity onPress={() => setDiscoverQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={styles.clearText}>Clear</Text>
+                <Text style={[styles.clearText, { color: theme.textMuted }]}>Clear</Text>
               </TouchableOpacity>
             ) : null}
           </View>
 
           {isSearching && (
             <View style={styles.searchingRow}>
-              <ActivityIndicator size="small" color="#6366f1" />
-              <Text style={styles.searchingText}>Searching for users...</Text>
+              <ActivityIndicator size="small" color={theme.accentPrimary} />
+              <Text style={[styles.searchingText, { color: theme.textMuted }]}>Searching for users...</Text>
             </View>
           )}
 
@@ -317,71 +337,72 @@ export default function MobileFriendsScreen() {
             ListEmptyComponent={
               discoverQuery.trim() && !isSearching ? (
                 <View style={styles.emptyContainer}>
-                  <Users color="#3f3f46" size={40} />
-                  <Text style={styles.emptyTitle}>No users found</Text>
-                  <Text style={styles.emptySubtitle}>
+                  <Users color={theme.textMuted} size={40} />
+                  <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No users found</Text>
+                  <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
                     No Linkiac accounts found matching &ldquo;@{discoverQuery.trim()}&rdquo;.
                   </Text>
                 </View>
               ) : !discoverQuery.trim() ? (
                 <View style={styles.emptyContainer}>
-                  <Search color="#3f3f46" size={40} />
-                  <Text style={styles.emptyTitle}>Find Linkiac Curators</Text>
-                  <Text style={styles.emptySubtitle}>
-                    Type a username or display name above to find and connect with people.
+                  <Search color={theme.textMuted} size={40} />
+                  <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>Find Linkiac Curators</Text>
+                  <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                    Enter a username or name to search and send friend requests.
                   </Text>
                 </View>
               ) : null
             }
             renderItem={({ item }) => {
+              if (item.id === currentUser.id) return null;
               const conn = connectionMap.get(item.id);
               const isAccepted = conn?.status === 'accepted';
               const isPendingIncoming = conn?.status === 'pending' && conn.isIncoming;
               const isPendingOutgoing = (conn?.status === 'pending' && !conn.isIncoming) || sentRequests.has(item.id);
 
               return (
-                <View style={styles.item}>
+                <View style={[styles.item, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                   <View style={styles.itemLeft}>
-                    <View style={styles.avatarMiniDiscover}>
+                    <View style={[styles.avatarMiniDiscover, { backgroundColor: theme.accentPrimaryMuted }]}>
                       {item.avatar_url ? (
                         <Image source={{ uri: item.avatar_url }} style={styles.avatarImg} />
                       ) : (
-                        <User color="#a5b4fc" size={16} />
+                        <User color={theme.accentPrimary} size={16} />
                       )}
                     </View>
                     <View>
-                      <Text style={styles.username}>@{item.username}</Text>
-                      <Text style={styles.name}>{item.display_name || `@${item.username}`}</Text>
+                      <Text style={[styles.username, { color: theme.textPrimary }]}>@{item.username}</Text>
+                      <Text style={[styles.name, { color: theme.textMuted }]}>{item.display_name || item.username}</Text>
                     </View>
                   </View>
 
                   <View style={styles.itemRight}>
                     {isAccepted ? (
-                      <View style={styles.badgeAccepted}>
-                        <Check color="#34d399" size={14} />
+                      <View style={[styles.badgeAccepted, { backgroundColor: '#064e3b' }]}>
+                        <UserCheck color="#34d399" size={14} />
                         <Text style={styles.badgeTextAccepted}>Friends</Text>
                       </View>
                     ) : isPendingIncoming ? (
                       <TouchableOpacity
-                        style={styles.badgePending}
+                        style={[styles.badgePending, { backgroundColor: theme.accentPrimary }]}
                         activeOpacity={0.7}
                         onPress={() => handleAccept(conn!.friendshipId, item.username)}
                       >
-                        <UserPlus color="#ffffff" size={14} />
-                        <Text style={styles.badgeTextPending}>Accept</Text>
+                        <UserPlus color={theme.accentText} size={14} />
+                        <Text style={[styles.badgeTextPending, { color: theme.accentText }]}>Accept</Text>
                       </TouchableOpacity>
                     ) : isPendingOutgoing ? (
-                      <View style={styles.badgePendingSent}>
-                        <Text style={styles.badgeTextPendingSent}>Pending</Text>
+                      <View style={[styles.badgePendingSent, { backgroundColor: theme.surfaceSubtle }]}>
+                        <Text style={[styles.badgeTextPendingSent, { color: theme.textMuted }]}>Requested</Text>
                       </View>
                     ) : (
                       <TouchableOpacity
-                        style={styles.addFriendBtn}
-                        activeOpacity={0.8}
+                        style={[styles.addFriendBtn, { backgroundColor: theme.accentPrimary }]}
+                        activeOpacity={0.7}
                         onPress={() => handleSendFriendRequest(item)}
                       >
-                        <UserPlus color="#ffffff" size={14} />
-                        <Text style={styles.addFriendBtnText}>Add Friend</Text>
+                        <UserPlus color={theme.accentText} size={14} />
+                        <Text style={[styles.addFriendBtnText, { color: theme.accentText }]}>Add</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -479,7 +500,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#065f46',
   },
   avatarPending: {
-    backgroundColor: '#4338ca',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
   },
   username: {
     color: '#fafafa',
@@ -511,7 +532,6 @@ const styles = StyleSheet.create({
   badgePending: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4f46e5',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -561,7 +581,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   segmentBtnActive: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: '#BCD94E',
   },
   segmentText: {
     color: '#a1a1aa',
@@ -569,7 +589,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   segmentTextActive: {
-    color: '#ffffff',
+    color: '#093329',
   },
   avatarImg: {
     width: '100%',
@@ -580,7 +600,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#312e81',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -599,7 +618,6 @@ const styles = StyleSheet.create({
   addFriendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4f46e5',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
@@ -613,7 +631,6 @@ const styles = StyleSheet.create({
   findPeopleCta: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4f46e5',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,

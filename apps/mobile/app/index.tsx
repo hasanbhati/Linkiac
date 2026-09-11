@@ -23,7 +23,7 @@ export default function Index() {
   if (isAuthenticated === null) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4f46e5" />
+        <ActivityIndicator size="large" color="#BCD94E" />
       </View>
     );
   }
@@ -38,7 +38,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09090b',
+    backgroundColor: '#090d0b',
     alignItems: 'center',
     justifyContent: 'center',
   },

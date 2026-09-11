@@ -30,6 +30,7 @@ import {
 } from 'lucide-react-native';
 import { Link, isSafeWebUrl, ensureUrlProtocol, extractDefaultThumbnail } from '@linkiac/shared';
 import { useApp } from '../../src/context/AppContext';
+import { useTheme } from '../../src/context/ThemeContext';
 import { SaveLinkModal } from '../../src/components/SaveLinkModal';
 import { LinkDetailModal } from '../../src/components/LinkDetailModal';
 import { ManageFoldersModal } from '../../src/components/ManageFoldersModal';
@@ -37,6 +38,7 @@ import { SendLinkToFriendsModal } from '../../src/components/SendLinkToFriendsMo
 
 export default function MobileLibraryScreen() {
   const { links, folders, categories, syncAllFromSupabase, bulkMoveLinks, bulkDeleteLinks } = useApp();
+  const { theme, isDark } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [topTab, setTopTab] = useState<'all' | 'unfiled' | 'folders'>('all');
@@ -223,71 +225,74 @@ export default function MobileLibraryScreen() {
     switch (status) {
       case 'reading':
         return (
-          <View style={[styles.statusBadge, styles.statusReading]}>
-            <BookOpen color="#a5b4fc" size={11} />
-            <Text style={[styles.statusText, { color: '#a5b4fc' }]}>Reading</Text>
+          <View style={[styles.statusBadge, isDark ? styles.statusReading : { backgroundColor: '#e0f2fe' }]}>
+            <BookOpen color={isDark ? '#38bdf8' : '#0284c7'} size={11} />
+            <Text style={[styles.statusText, { color: isDark ? '#38bdf8' : '#0284c7' }]}>Reading</Text>
           </View>
         );
       case 'done':
         return (
-          <View style={[styles.statusBadge, styles.statusDone]}>
-            <CheckCircle2 color="#6ee7b7" size={11} />
-            <Text style={[styles.statusText, { color: '#6ee7b7' }]}>Done</Text>
+          <View style={[styles.statusBadge, isDark ? styles.statusDone : { backgroundColor: '#dcfce7' }]}>
+            <CheckCircle2 color={isDark ? '#6ee7b7' : '#15803d'} size={11} />
+            <Text style={[styles.statusText, { color: isDark ? '#6ee7b7' : '#15803d' }]}>Done</Text>
           </View>
         );
       default:
         return (
-          <View style={[styles.statusBadge, styles.statusToRead]}>
-            <Text style={[styles.statusText, { color: '#a1a1aa' }]}>To Read</Text>
+          <View style={[styles.statusBadge, { backgroundColor: theme.surfaceSubtle }]}>
+            <Text style={[styles.statusText, { color: theme.textMuted }]}>To Read</Text>
           </View>
         );
     }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.canvas }]}>
       {/* Top Header Row */}
       <View style={styles.headerRow}>
-        <Text style={styles.headerTitle}>Library</Text>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Library</Text>
         <TouchableOpacity
-          style={[styles.selectModeBtn, isSelectionMode && styles.selectModeBtnActive]}
+          style={[
+            styles.selectModeBtn,
+            { backgroundColor: isSelectionMode ? theme.accentPrimary : theme.surfaceSubtle, borderColor: theme.border, borderWidth: 1 }
+          ]}
           onPress={() => {
             setIsSelectionMode(!isSelectionMode);
             if (isSelectionMode) setSelectedLinkIds(new Set());
           }}
         >
-          <Text style={[styles.selectModeBtnText, isSelectionMode && styles.selectModeBtnTextActive]}>
+          <Text style={[styles.selectModeBtnText, { color: isSelectionMode ? '#ffffff' : theme.textSecondary }]}>
             {isSelectionMode ? 'Done' : 'Select'}
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Search and Action Bar */}
-      <View style={styles.searchBar}>
-        <Search color="#71717a" size={18} />
+      <View style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Search color={theme.textMuted} size={18} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: theme.textPrimary }]}
           placeholder="Search links, notes, or folders..."
-          placeholderTextColor="#71717a"
+          placeholderTextColor={theme.textMuted}
           value={search}
           onChangeText={setSearch}
         />
         {search ? (
           <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={styles.clearSearchText}>Clear</Text>
+            <Text style={[styles.clearSearchText, { color: theme.textSecondary }]}>Clear</Text>
           </TouchableOpacity>
         ) : null}
       </View>
 
       {/* Matching Folders from Search (Item 5) */}
       {matchingFolders.length > 0 && (
-        <View style={styles.matchingFoldersContainer}>
-          <Text style={styles.matchingFoldersTitle}>MATCHING FOLDERS ({matchingFolders.length}):</Text>
+        <View style={[styles.matchingFoldersContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.matchingFoldersTitle, { color: theme.textMuted }]}>MATCHING FOLDERS ({matchingFolders.length}):</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.matchingFoldersScroll}>
             {matchingFolders.map(mf => (
               <TouchableOpacity
                 key={mf.id}
-                style={styles.matchingFolderChip}
+                style={[styles.matchingFolderChip, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
                 onPress={() => {
                   setTopTab('folders');
                   setSelectedFolderId(mf.id);
@@ -295,7 +300,7 @@ export default function MobileLibraryScreen() {
                 }}
               >
                 <Folder color="#f59e0b" size={12} style={{ marginRight: 4 }} />
-                <Text style={styles.matchingFolderChipText}>{mf.name}</Text>
+                <Text style={[styles.matchingFolderChipText, { color: theme.textPrimary }]}>{mf.name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -305,33 +310,42 @@ export default function MobileLibraryScreen() {
       {/* Top Tab Filter Switcher (Item 1: All links | Unfiled | Folders) */}
       <View style={styles.topTabBar}>
         <TouchableOpacity
-          style={[styles.topTabBtn, topTab === 'all' && styles.topTabBtnActive]}
+          style={[
+            styles.topTabBtn,
+            { backgroundColor: topTab === 'all' ? theme.accentPrimary : theme.surface, borderColor: topTab === 'all' ? theme.accentPrimary : theme.border }
+          ]}
           activeOpacity={0.8}
           onPress={() => {
             setTopTab('all');
             setSelectedFolderId(null);
           }}
         >
-          <Text style={[styles.topTabBtnText, topTab === 'all' && styles.topTabBtnTextActive]}>
+          <Text style={[styles.topTabBtnText, { color: topTab === 'all' ? '#ffffff' : theme.textSecondary }]}>
             All links ({links.length})
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.topTabBtn, topTab === 'unfiled' && styles.topTabBtnActive]}
+          style={[
+            styles.topTabBtn,
+            { backgroundColor: topTab === 'unfiled' ? theme.accentPrimary : theme.surface, borderColor: topTab === 'unfiled' ? theme.accentPrimary : theme.border }
+          ]}
           activeOpacity={0.8}
           onPress={() => {
             setTopTab('unfiled');
             setSelectedFolderId(null);
           }}
         >
-          <Text style={[styles.topTabBtnText, topTab === 'unfiled' && styles.topTabBtnTextActive]}>
+          <Text style={[styles.topTabBtnText, { color: topTab === 'unfiled' ? '#ffffff' : theme.textSecondary }]}>
             Unfiled ({links.filter(l => !l.folder_id).length})
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.topTabBtn, topTab === 'folders' && styles.topTabBtnActive]}
+          style={[
+            styles.topTabBtn,
+            { backgroundColor: topTab === 'folders' ? theme.accentPrimary : theme.surface, borderColor: topTab === 'folders' ? theme.accentPrimary : theme.border }
+          ]}
           activeOpacity={0.8}
           onPress={() => {
             setTopTab('folders');
@@ -341,7 +355,7 @@ export default function MobileLibraryScreen() {
           }}
         >
           <Folder color={topTab === 'folders' ? '#ffffff' : '#f59e0b'} size={13} style={{ marginRight: 4 }} />
-          <Text style={[styles.topTabBtnText, topTab === 'folders' && styles.topTabBtnTextActive]}>
+          <Text style={[styles.topTabBtnText, { color: topTab === 'folders' ? '#ffffff' : theme.textSecondary }]}>
             Folders ({folders.length})
           </Text>
         </TouchableOpacity>
@@ -358,7 +372,10 @@ export default function MobileLibraryScreen() {
             <TouchableOpacity
               style={[
                 styles.categoryBarChip,
-                selectedCategoryId === null && styles.categoryBarChipActive,
+                {
+                  backgroundColor: selectedCategoryId === null ? theme.accentPrimaryMuted : theme.surfaceSubtle,
+                  borderColor: selectedCategoryId === null ? theme.accentPrimary : theme.border,
+                },
               ]}
               onPress={() => setSelectedCategoryId(null)}
               activeOpacity={0.8}
@@ -366,7 +383,10 @@ export default function MobileLibraryScreen() {
               <Text
                 style={[
                   styles.categoryBarChipText,
-                  selectedCategoryId === null && styles.categoryBarChipTextActive,
+                  {
+                    color: selectedCategoryId === null ? theme.accentPrimary : theme.textSecondary,
+                    fontWeight: selectedCategoryId === null ? '700' : '500',
+                  },
                 ]}
               >
                 All Categories
@@ -382,20 +402,26 @@ export default function MobileLibraryScreen() {
                   key={cat.id}
                   style={[
                     styles.categoryBarChip,
-                    isSelected && styles.categoryBarChipActive,
+                    {
+                      backgroundColor: isSelected ? theme.accentPrimaryMuted : theme.surfaceSubtle,
+                      borderColor: isSelected ? theme.accentPrimary : theme.border,
+                    },
                   ]}
                   onPress={() => setSelectedCategoryId(isSelected ? null : cat.id)}
                   activeOpacity={0.8}
                 >
                   <Layers
-                    color={isSelected ? '#ffffff' : '#818cf8'}
+                    color={isSelected ? theme.accentPrimary : theme.textMuted}
                     size={11}
                     style={{ marginRight: 5 }}
                   />
                   <Text
                     style={[
                       styles.categoryBarChipText,
-                      isSelected && styles.categoryBarChipTextActive,
+                      {
+                        color: isSelected ? theme.accentPrimary : theme.textSecondary,
+                        fontWeight: isSelected ? '700' : '500',
+                      },
                     ]}
                   >
                     {cat.name} ({catLinksCount})
@@ -409,7 +435,7 @@ export default function MobileLibraryScreen() {
 
       {/* Horizontal Draggable Folder Bar (Shown when Folders tab is active, Item 1) */}
       {topTab === 'folders' && (
-        <View style={styles.horizontalFolderContainer}>
+        <View style={[styles.horizontalFolderContainer, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={true}
@@ -421,22 +447,34 @@ export default function MobileLibraryScreen() {
               return (
                 <TouchableOpacity
                   key={rf.id}
-                  style={[styles.horizontalFolderChip, isSelected && styles.horizontalFolderChipActive]}
+                  style={[
+                    styles.horizontalFolderChip,
+                    {
+                      backgroundColor: isSelected ? (isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)') : theme.surface,
+                      borderColor: isSelected ? '#f59e0b' : theme.border,
+                    },
+                  ]}
                   onPress={() => setSelectedFolderId(rf.id)}
                 >
-                  <Folder color={isSelected ? '#ffffff' : '#f59e0b'} size={13} style={{ marginRight: 5 }} />
-                  <Text style={[styles.horizontalFolderChipText, isSelected && styles.horizontalFolderChipTextActive]}>
+                  <Folder color={isSelected ? (isDark ? '#fbbf24' : '#b45309') : '#f59e0b'} size={13} style={{ marginRight: 5 }} />
+                  <Text style={[
+                    styles.horizontalFolderChipText,
+                    {
+                      color: isSelected ? (isDark ? '#fbbf24' : '#b45309') : theme.textSecondary,
+                      fontWeight: isSelected ? '600' : '500',
+                    }
+                  ]}>
                     {rf.name} ({fCount})
                   </Text>
                 </TouchableOpacity>
               );
             })}
             <TouchableOpacity
-              style={styles.horizontalManageBtn}
+              style={[styles.horizontalManageBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
               onPress={() => setIsManageModalOpen(true)}
             >
-              <FolderPlus color="#a1a1aa" size={13} style={{ marginRight: 4 }} />
-              <Text style={styles.horizontalManageText}>+ Folder</Text>
+              <FolderPlus color={theme.textMuted} size={13} style={{ marginRight: 4 }} />
+              <Text style={[styles.horizontalManageText, { color: theme.textSecondary }]}>+ Folder</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -444,34 +482,34 @@ export default function MobileLibraryScreen() {
 
       {/* Active Folder Subfolders and Back Button (Item 1 & 4) */}
       {topTab === 'folders' && activeFolder && (parentFolder || subfolders.length > 0) && (
-        <View style={styles.activeFolderHeader}>
+        <View style={[styles.activeFolderHeader, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           {parentFolder && (
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => setSelectedFolderId(parentFolder.id)}
             >
-              <ArrowLeft color="#818cf8" size={13} style={{ marginRight: 4 }} />
-              <Text style={styles.backBtnText}>Back to {parentFolder.name}</Text>
+              <ArrowLeft color={theme.accentPrimary} size={13} style={{ marginRight: 4 }} />
+              <Text style={[styles.backBtnText, { color: theme.accentPrimary }]}>Back to {parentFolder.name}</Text>
             </TouchableOpacity>
           )}
 
           {/* Subfolders Grid inside active folder */}
           {subfolders.length > 0 && (
-            <View style={styles.subfolderSection}>
-              <Text style={styles.subfolderSectionTitle}>SUBFOLDERS ({subfolders.length})</Text>
+            <View style={[styles.subfolderSection, { borderTopColor: theme.border }]}>
+              <Text style={[styles.subfolderSectionTitle, { color: theme.textMuted }]}>SUBFOLDERS ({subfolders.length})</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subfoldersScroll}>
                 {subfolders.map(sub => {
                   const subCount = links.filter(l => l.folder_id === sub.id).length;
                   return (
                     <TouchableOpacity
                       key={sub.id}
-                      style={styles.subfolderCard}
+                      style={[styles.subfolderCard, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
                       onPress={() => setSelectedFolderId(sub.id)}
                     >
                       <Folder color="#f59e0b" size={13} style={{ marginRight: 5 }} />
-                      <Text style={styles.subfolderCardName} numberOfLines={1}>{sub.name}</Text>
-                      <Text style={styles.subfolderCardCount}>({subCount})</Text>
-                      <ChevronRight color="#71717a" size={11} style={{ marginLeft: 3 }} />
+                      <Text style={[styles.subfolderCardName, { color: theme.textPrimary }]} numberOfLines={1}>{sub.name}</Text>
+                      <Text style={[styles.subfolderCardCount, { color: theme.textMuted }]}>({subCount})</Text>
+                      <ChevronRight color={theme.textMuted} size={11} style={{ marginLeft: 3 }} />
                     </TouchableOpacity>
                   );
                 })}
@@ -489,8 +527,8 @@ export default function MobileLibraryScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#6366f1"
-            colors={['#6366f1']}
+            tintColor={theme.accentPrimary}
+            colors={[theme.accentPrimary]}
           />
         }
         contentContainerStyle={[
@@ -499,11 +537,11 @@ export default function MobileLibraryScreen() {
         ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <BookOpen color="#3f3f46" size={48} />
-            <Text style={styles.emptyTitle}>
+            <BookOpen color={theme.border} size={48} />
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
               {search ? 'No matching links or notes' : 'No items found'}
             </Text>
-            <Text style={styles.emptySubtitle}>
+            <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>
               {search
                 ? 'Try a different search term or clear the filter.'
                 : 'Tap the + button below to save a link or note!'}
@@ -519,7 +557,8 @@ export default function MobileLibraryScreen() {
             <TouchableOpacity
               style={[
                 styles.card,
-                isSelectionMode && isSelected && styles.cardSelected,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                isSelectionMode && isSelected && { borderColor: theme.accentPrimary, backgroundColor: theme.accentPrimaryMuted },
               ]}
               activeOpacity={0.7}
               onPress={() => {
@@ -532,7 +571,7 @@ export default function MobileLibraryScreen() {
               onLongPress={() => handleCardLongPress(item.id)}
             >
               {effectiveThumbnail ? (
-                <View style={[styles.cardThumbnailWrapper, isFavicon && styles.cardFaviconWrapper]}>
+                <View style={[styles.cardThumbnailWrapper, { backgroundColor: theme.surfaceSubtle, borderBottomColor: theme.border }, isFavicon && styles.cardFaviconWrapper]}>
                   <Image
                     source={{ uri: effectiveThumbnail }}
                     style={isFavicon ? styles.cardFaviconImg : styles.cardThumbnailImg}
@@ -545,17 +584,17 @@ export default function MobileLibraryScreen() {
                 {/* Title & Status Row */}
                 <View style={styles.cardHeader}>
                   {isSelectionMode && (
-                    <View style={[styles.selectCircle, isSelected && styles.selectCircleActive]}>
+                    <View style={[styles.selectCircle, { borderColor: theme.textMuted }, isSelected && { backgroundColor: theme.accentPrimary, borderColor: theme.accentPrimary }]}>
                       {isSelected && <Check color="#ffffff" size={13} strokeWidth={3} />}
                     </View>
                   )}
-                  <Text style={styles.cardTitle} numberOfLines={2}>
+                  <Text style={[styles.cardTitle, { color: theme.textPrimary }]} numberOfLines={2}>
                     {item.title || item.url}
                   </Text>
                   {getStatusBadge(item.reading_status)}
                 </View>
 
-                <Text style={styles.cardUrl} numberOfLines={1}>
+                <Text style={[styles.cardUrl, { color: theme.textSecondary }]} numberOfLines={1}>
                   {item.url}
                 </Text>
 
@@ -574,20 +613,20 @@ export default function MobileLibraryScreen() {
                 })()}
 
                 {item.comment ? (
-                  <Text style={styles.commentText} numberOfLines={2}>
+                  <Text style={[styles.commentText, { backgroundColor: theme.surfaceSubtle, color: theme.textSecondary, borderLeftColor: theme.accentPrimary }]} numberOfLines={2}>
                     &quot;{item.comment}&quot;
                   </Text>
                 ) : null}
 
-                <View style={styles.cardFooter}>
+                <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
                   {item.domain ? (
                     <View style={styles.domainTag}>
-                      <ExternalLink color="#a1a1aa" size={12} />
-                      <Text style={styles.domainText}>{item.domain}</Text>
+                      <ExternalLink color={theme.textMuted} size={12} />
+                      <Text style={[styles.domainText, { color: theme.textMuted }]}>{item.domain}</Text>
                     </View>
                   ) : (
                     <View style={styles.domainTag}>
-                      <Text style={styles.domainText}>Note / Snippet</Text>
+                      <Text style={[styles.domainText, { color: theme.textMuted }]}>Note / Snippet</Text>
                     </View>
                   )}
 
@@ -595,7 +634,7 @@ export default function MobileLibraryScreen() {
                     style={styles.detailsBtn}
                     onPress={() => setSelectedLink(item)}
                   >
-                    <Text style={styles.detailsBtnText}>Details</Text>
+                    <Text style={[styles.detailsBtnText, { color: theme.textSecondary }]}>Details</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -607,23 +646,23 @@ export default function MobileLibraryScreen() {
       {/* Floating Centered + Action Button (Item 4) */}
       {!isSelectionMode && (
         <TouchableOpacity
-          style={styles.floatingAddBtn}
+          style={[styles.floatingAddBtn, { backgroundColor: theme.accentPrimary }]}
           activeOpacity={0.8}
           onPress={() => setIsSaveModalOpen(true)}
         >
-          <Plus color="#ffffff" size={26} strokeWidth={2.5} />
+          <Plus color={theme.accentText} size={26} strokeWidth={2.5} />
         </TouchableOpacity>
       )}
 
       {/* Floating Selection Action Bar */}
       {isSelectionMode && (
-        <View style={styles.floatingActionBar}>
+        <View style={[styles.floatingActionBar, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.actionBarLeft}>
-            <Text style={styles.actionSelectedCount}>
+            <Text style={[styles.actionSelectedCount, { color: theme.textPrimary }]}>
               {selectedLinkIds.size} selected
             </Text>
             <TouchableOpacity onPress={toggleSelectAll} style={styles.selectAllBtn}>
-              <Text style={styles.selectAllBtnText}>
+              <Text style={[styles.selectAllBtnText, { color: theme.accentPrimary }]}>
                 {selectedLinkIds.size === filteredLinks.length && filteredLinks.length > 0
                   ? 'Deselect All'
                   : 'Select All'}
@@ -636,18 +675,20 @@ export default function MobileLibraryScreen() {
               style={[
                 styles.actionBtn,
                 styles.actionBtnSend,
+                { backgroundColor: theme.accentPrimary },
                 selectedLinkIds.size === 0 && styles.actionBtnDisabled,
               ]}
               disabled={selectedLinkIds.size === 0}
               onPress={() => setIsSendFriendsModalOpen(true)}
             >
-              <Text style={styles.actionBtnSendText}>Send</Text>
+              <Text style={[styles.actionBtnSendText, { color: theme.accentText }]}>Send</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
                 styles.actionBtn,
                 styles.actionBtnMove,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, borderWidth: 1 },
                 selectedLinkIds.size === 0 && styles.actionBtnDisabled,
               ]}
               disabled={selectedLinkIds.size === 0}
@@ -656,19 +697,20 @@ export default function MobileLibraryScreen() {
                 setIsMoveModalOpen(true);
               }}
             >
-              <Text style={styles.actionBtnText}>Move</Text>
+              <Text style={[styles.actionBtnText, { color: theme.textPrimary }]}>Move</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
                 styles.actionBtn,
                 styles.actionBtnDelete,
+                { backgroundColor: theme.dangerBg, borderColor: theme.danger, borderWidth: 1 },
                 selectedLinkIds.size === 0 && styles.actionBtnDisabled,
               ]}
               disabled={selectedLinkIds.size === 0}
               onPress={handleBulkDelete}
             >
-              <Trash2 color="#ef4444" size={16} />
+              <Trash2 color={theme.danger} size={16} />
             </TouchableOpacity>
           </View>
         </View>
@@ -682,67 +724,83 @@ export default function MobileLibraryScreen() {
         onRequestClose={() => setIsMoveModalOpen(false)}
       >
         <View style={styles.moveModalOverlay}>
-          <View style={styles.moveModalContent}>
+          <View style={[styles.moveModalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.moveModalHeader}>
-              <Text style={styles.moveModalTitle}>Move {selectedLinkIds.size} Link(s)</Text>
+              <Text style={[styles.moveModalTitle, { color: theme.textPrimary }]}>Move {selectedLinkIds.size} Link(s)</Text>
               <TouchableOpacity onPress={() => setIsMoveModalOpen(false)}>
-                <X color="#a1a1aa" size={20} />
+                <X color={theme.textMuted} size={20} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.moveModalSubtitle}>Select Destination Folder</Text>
+            <Text style={[styles.moveModalSubtitle, { color: theme.textSecondary }]}>Select Destination Folder</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moveScrollRow}>
               <TouchableOpacity
                 style={[
                   styles.moveModalPill,
-                  moveTargetFolderId === null && styles.moveModalPillActive,
+                  {
+                    backgroundColor: moveTargetFolderId === null ? theme.accentPrimary : theme.surfaceSubtle,
+                    borderColor: moveTargetFolderId === null ? theme.accentPrimary : theme.border,
+                  },
                 ]}
                 onPress={() => setMoveTargetFolderId(null)}
               >
+                <Folder color={moveTargetFolderId === null ? theme.accentText : '#f59e0b'} size={12} style={{ marginRight: 4 }} />
                 <Text
                   style={[
                     styles.moveModalPillText,
-                    moveTargetFolderId === null && styles.moveModalPillTextActive,
+                    {
+                      color: moveTargetFolderId === null ? theme.accentText : theme.textSecondary,
+                      fontWeight: moveTargetFolderId === null ? '600' : '400',
+                    },
                   ]}
                 >
                   Unfiled (No folder)
                 </Text>
               </TouchableOpacity>
-              {folders.map((f) => (
-                <TouchableOpacity
-                  key={f.id}
-                  style={[
-                    styles.moveModalPill,
-                    moveTargetFolderId === f.id && styles.moveModalPillActive,
-                  ]}
-                  onPress={() => setMoveTargetFolderId(f.id)}
-                >
-                  <Folder color={moveTargetFolderId === f.id ? '#ffffff' : '#f59e0b'} size={12} style={{ marginRight: 4 }} />
-                  <Text
+              {folders.map((f) => {
+                const isPillActive = moveTargetFolderId === f.id;
+                return (
+                  <TouchableOpacity
+                    key={f.id}
                     style={[
-                      styles.moveModalPillText,
-                      moveTargetFolderId === f.id && styles.moveModalPillTextActive,
+                      styles.moveModalPill,
+                      {
+                        backgroundColor: isPillActive ? theme.accentPrimary : theme.surfaceSubtle,
+                        borderColor: isPillActive ? theme.accentPrimary : theme.border,
+                      },
                     ]}
+                    onPress={() => setMoveTargetFolderId(f.id)}
                   >
-                    {f.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Folder color={isPillActive ? theme.accentText : '#f59e0b'} size={12} style={{ marginRight: 4 }} />
+                    <Text
+                      style={[
+                        styles.moveModalPillText,
+                        {
+                          color: isPillActive ? theme.accentText : theme.textSecondary,
+                          fontWeight: isPillActive ? '600' : '400',
+                        },
+                      ]}
+                    >
+                      {f.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
 
             <View style={styles.moveModalActions}>
               <TouchableOpacity
-                style={styles.moveModalCancelBtn}
+                style={[styles.moveModalCancelBtn, { backgroundColor: theme.surfaceSubtle }]}
                 onPress={() => setIsMoveModalOpen(false)}
               >
-                <Text style={styles.moveModalCancelText}>Cancel</Text>
+                <Text style={[styles.moveModalCancelText, { color: theme.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.moveModalSubmitBtn, isBulkMoving && { opacity: 0.6 }]}
+                style={[styles.moveModalSubmitBtn, { backgroundColor: theme.accentPrimary }, isBulkMoving && { opacity: 0.6 }]}
                 onPress={handleBulkMove}
                 disabled={isBulkMoving}
               >
-                <Text style={styles.moveModalSubmitText}>
+                <Text style={[styles.moveModalSubmitText, { color: theme.accentText }]}>
                   {isBulkMoving ? 'Moving...' : 'Move Links'}
                 </Text>
               </TouchableOpacity>
@@ -819,7 +877,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#27272a',
   },
   selectModeBtnActive: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: '#BCD94E',
   },
   selectModeBtnText: {
     color: '#a1a1aa',
@@ -827,7 +885,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   selectModeBtnTextActive: {
-    color: '#ffffff',
+    color: '#093329',
   },
   searchBar: {
     flexDirection: 'row',
@@ -901,8 +959,8 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
   },
   topTabBtnActive: {
-    backgroundColor: '#4f46e5',
-    borderColor: '#6366f1',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
+    borderColor: '#BCD94E',
   },
   topTabBtnText: {
     color: '#a1a1aa',
@@ -910,7 +968,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   topTabBtnTextActive: {
-    color: '#ffffff',
+    color: '#BCD94E',
     fontWeight: '600',
   },
   categoryBarContainer: {
@@ -932,8 +990,8 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
   },
   categoryBarChipActive: {
-    backgroundColor: '#312e81',
-    borderColor: '#6366f1',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
+    borderColor: '#BCD94E',
   },
   categoryBarChipText: {
     color: '#a1a1aa',
@@ -941,7 +999,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoryBarChipTextActive: {
-    color: '#e0e7ff',
+    color: '#BCD94E',
     fontWeight: '700',
   },
   horizontalFolderContainer: {
@@ -1011,7 +1069,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   backBtnText: {
-    color: '#818cf8',
+    color: '#BCD94E',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -1075,12 +1133,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#4f46e5',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#4f46e5',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 8,
     zIndex: 40,
@@ -1142,7 +1198,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   statusReading: {
-    backgroundColor: '#1e1b4b',
+    backgroundColor: 'rgba(14, 165, 233, 0.15)',
   },
   statusToRead: {
     backgroundColor: '#27272a',
@@ -1190,7 +1246,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
     borderLeftWidth: 2,
-    borderLeftColor: '#6366f1',
+    borderLeftColor: '#BCD94E',
   },
   cardFooter: {
     flexDirection: 'row',
@@ -1205,6 +1261,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flex: 1,
+    marginRight: 6,
   },
   domainText: {
     color: '#71717a',
@@ -1238,8 +1296,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   cardSelected: {
-    borderColor: '#6366f1',
-    backgroundColor: 'rgba(99, 102, 241, 0.08)',
+    borderColor: '#BCD94E',
+    backgroundColor: 'rgba(188, 217, 78, 0.08)',
   },
   selectCircle: {
     width: 18,
@@ -1252,8 +1310,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   selectCircleActive: {
-    backgroundColor: '#6366f1',
-    borderColor: '#6366f1',
+    backgroundColor: '#BCD94E',
+    borderColor: '#BCD94E',
   },
   floatingActionBar: {
     position: 'absolute',
@@ -1288,7 +1346,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   selectAllBtnText: {
-    color: '#818cf8',
+    color: '#BCD94E',
     fontSize: 12,
   },
   actionBarRight: {
@@ -1305,12 +1363,12 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   actionBtnSend: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: '#BCD94E',
   },
   actionBtnSendText: {
-    color: '#ffffff',
+    color: '#093329',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   actionBtnMove: {
     backgroundColor: '#27272a',
@@ -1370,15 +1428,15 @@ const styles = StyleSheet.create({
     borderColor: '#3f3f46',
   },
   moveModalPillActive: {
-    backgroundColor: '#4f46e5',
-    borderColor: '#6366f1',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
+    borderColor: '#BCD94E',
   },
   moveModalPillText: {
     color: '#d4d4d8',
     fontSize: 13,
   },
   moveModalPillTextActive: {
-    color: '#ffffff',
+    color: '#BCD94E',
     fontWeight: '600',
   },
   moveModalActions: {
@@ -1400,7 +1458,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#4f46e5',
   },
   moveModalSubmitText: {
     color: '#ffffff',

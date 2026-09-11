@@ -578,11 +578,29 @@ create or replace function public.delete_user_account()
 returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = public, auth, pg_temp
 as $$
+declare
+  caller_is_admin boolean;
+  active_admin_count int;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
+  end if;
+
+  -- Admin safeguard: prevent the last active administrator from deleting their account
+  select coalesce(is_admin, false) into caller_is_admin
+  from public.profiles
+  where id = auth.uid();
+
+  if caller_is_admin is true then
+    select count(*) into active_admin_count
+    from public.profiles
+    where is_admin = true and status = 'active' and id <> auth.uid();
+
+    if active_admin_count = 0 then
+      raise exception 'Security Error: You are the last remaining active administrator. Please promote another active user to administrator before deleting this account.';
+    end if;
   end if;
 
   delete from auth.users where id = auth.uid();

@@ -125,9 +125,9 @@ export function FolderTree({
           onClick={() => onSelectFolder(folder.id)}
           className={`group flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs transition-all cursor-pointer ${
             isSelected
-              ? 'bg-indigo-600/15 text-indigo-400 font-medium'
-              : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
-          } ${isDragOver ? 'ring-2 ring-indigo-500 bg-indigo-600/30 text-white font-semibold shadow-lg shadow-indigo-500/20 scale-[1.02]' : ''}`}
+              ? 'bg-[#093329]/10 text-[#093329] dark:bg-[#BCD94E]/15 dark:text-[#BCD94E] font-medium'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200'
+          } ${isDragOver ? 'ring-2 ring-[#BCD94E] bg-[#BCD94E]/20 text-[#093329] dark:text-[#BCD94E] font-semibold shadow-lg shadow-[#BCD94E]/20 scale-[1.02]' : ''}`}
           style={{ paddingLeft: `${Math.min(depth * 14 + 10, 80)}px` }}
         >
           <div className="flex items-center gap-1.5 truncate">
@@ -135,7 +135,8 @@ export function FolderTree({
               <button
                 type="button"
                 onClick={e => toggleFolder(folder.id, e)}
-                className="w-4 h-4 flex items-center justify-center text-zinc-500 hover:text-zinc-200"
+                aria-label={isExpanded ? 'Collapse folder' : 'Expand folder'}
+                className="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:text-zinc-500 dark:hover:text-zinc-200"
               >
                 {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
               </button>
@@ -143,16 +144,16 @@ export function FolderTree({
               <div className="w-4" />
             )}
             {isExpanded ? (
-              <FolderOpen size={14} className="text-indigo-400 flex-shrink-0" />
+              <FolderOpen size={14} className="text-[#093329] dark:text-[#BCD94E] flex-shrink-0" />
             ) : (
-              <FolderIcon size={14} className="text-amber-400/80 flex-shrink-0" />
+              <FolderIcon size={14} className="text-amber-500 flex-shrink-0" />
             )}
             <span className="truncate">{folder.name}</span>
           </div>
 
           <div className="flex items-center gap-1">
             {isDragOver ? (
-              <span className="text-[10px] font-bold text-indigo-200 bg-indigo-900/90 border border-indigo-400 px-1.5 py-0.5 rounded shadow-sm">
+              <span className="text-[10px] font-bold text-[#093329] bg-[#BCD94E] border border-[#BCD94E] px-1.5 py-0.5 rounded shadow-sm">
                 Drop to move
               </span>
             ) : (
@@ -161,27 +162,29 @@ export function FolderTree({
                   <button
                     type="button"
                     title="Add nested subfolder"
+                    aria-label="Add nested subfolder"
                     onClick={e => handleCreateSubfolder(folder.id, e)}
-                    className="p-1 hover:text-zinc-100 rounded"
+                    className="p-1 hover:text-gray-900 dark:hover:text-zinc-100 rounded"
                   >
                     <Plus size={12} />
                   </button>
                   <button
                     type="button"
                     title="Delete folder"
+                    aria-label="Delete folder"
                     onClick={e => {
                       e.stopPropagation();
                       if (confirm(`Delete folder "${folder.name}" and subfolders? Contained links will become unfiled.`)) {
                         deleteFolder(folder.id);
                       }
                     }}
-                    className="p-1 hover:text-red-400 rounded"
+                    className="p-1 hover:text-red-500 dark:hover:text-red-400 rounded"
                   >
                     <Trash2 size={12} />
                   </button>
                 </div>
                 {folderLinkCount > 0 && (
-                  <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-full">
+                  <span className="text-[10px] font-mono text-gray-500 bg-gray-100 dark:text-zinc-500 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
                     {folderLinkCount}
                   </span>
                 )}
@@ -211,25 +214,26 @@ export function FolderTree({
           onDrop={e => handleDrop(e, { type: 'all' })}
           className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
             !selectedFolderId && !isUnfiledOnly
-              ? 'bg-zinc-800 text-white shadow-sm'
-              : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-          } ${dragOverTarget === 'all' ? 'ring-2 ring-indigo-500 bg-indigo-600/30 text-white font-semibold scale-[1.02] shadow-lg shadow-indigo-500/20' : ''}`}
+              ? 'bg-[#093329] text-white dark:bg-zinc-800 shadow-sm'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-200'
+          } ${dragOverTarget === 'all' ? 'ring-2 ring-[#BCD94E] bg-[#BCD94E]/20 text-[#093329] dark:text-[#BCD94E] font-semibold scale-[1.02] shadow-lg shadow-[#BCD94E]/20' : ''}`}
         >
           <span className="flex items-center gap-2">
-            <Layers size={15} className="text-indigo-400" />
+            <Layers size={15} className="text-[#093329] dark:text-[#BCD94E]" />
             <span>All Links</span>
           </span>
           {dragOverTarget === 'all' ? (
-            <span className="text-[10px] font-bold text-indigo-200 bg-indigo-900/90 border border-indigo-400 px-1.5 py-0.5 rounded shadow-sm">
+            <span className="text-[10px] font-bold text-[#093329] bg-[#BCD94E] border border-[#BCD94E] px-1.5 py-0.5 rounded shadow-sm">
               Drop to unfile
             </span>
           ) : (
-            <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-mono text-gray-500 bg-gray-100 dark:text-zinc-500 dark:bg-zinc-800/80 px-2 py-0.5 rounded-full">
               {totalLinksCount}
             </span>
           )}
         </button>
 
+        {/* Unfiled */}
         <button
           type="button"
           onClick={onSelectUnfiled}
@@ -238,34 +242,31 @@ export function FolderTree({
           onDrop={e => handleDrop(e, { type: 'unfiled' })}
           className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
             isUnfiledOnly
-              ? 'bg-zinc-800 text-white shadow-sm'
-              : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-          } ${dragOverTarget === 'unfiled' ? 'ring-2 ring-amber-500 bg-amber-600/20 text-white font-semibold scale-[1.02] shadow-lg shadow-amber-500/20' : ''}`}
+              ? 'bg-[#093329] text-white dark:bg-zinc-800 shadow-sm'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-200'
+          } ${dragOverTarget === 'unfiled' ? 'ring-2 ring-[#BCD94E] bg-[#BCD94E]/20 text-[#093329] dark:text-[#BCD94E] font-semibold scale-[1.02] shadow-lg shadow-[#BCD94E]/20' : ''}`}
         >
           <span className="flex items-center gap-2">
-            <Inbox size={15} className="text-amber-400" />
+            <Inbox size={15} className="text-gray-400 dark:text-zinc-500" />
             <span>Unfiled</span>
           </span>
-          {dragOverTarget === 'unfiled' ? (
-            <span className="text-[10px] font-bold text-amber-300 bg-amber-950/90 border border-amber-500/40 px-1.5 py-0.5 rounded shadow-sm">
-              Drop to unfile
-            </span>
-          ) : (
-            <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 px-2 py-0.5 rounded-full">
-              {unfiledCount}
-            </span>
-          )}
+          <span className="text-[10px] font-mono text-gray-500 bg-gray-100 dark:text-zinc-500 dark:bg-zinc-800/80 px-2 py-0.5 rounded-full">
+            {unfiledCount}
+          </span>
         </button>
       </div>
 
-      {/* Folders Section */}
-      <div className="pt-2 border-t border-zinc-800/80">
-        <div className="flex items-center justify-between mb-2 px-2">
-          <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Folders</span>
+      {/* Folders Tree Section */}
+      <div>
+        <div className="flex items-center justify-between px-2 mb-1.5">
+          <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
+            Folders
+          </span>
           <button
             type="button"
             onClick={() => setShowAddRootFolder(!showAddRootFolder)}
-            className="text-zinc-400 hover:text-zinc-100 p-1 rounded"
+            className="text-gray-400 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-100 p-1 rounded transition-colors"
+            aria-label="Create New Folder"
             title="Create New Folder"
           >
             <FolderPlus size={14} />
@@ -281,11 +282,11 @@ export function FolderTree({
                 value={newRootFolderName}
                 onChange={e => setNewRootFolderName(e.target.value)}
                 autoFocus
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="flex-1 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#093329] dark:focus:ring-[#BCD94E] dark:focus:border-[#BCD94E] shadow-xs"
               />
               <button
                 type="submit"
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-lg text-xs font-medium"
+                className="bg-[#093329] hover:bg-[#0d4739] dark:bg-[#BCD94E] dark:hover:bg-[#a8c43f] text-white dark:text-[#093329] dark:font-bold px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
               >
                 Save
               </button>
@@ -295,7 +296,7 @@ export function FolderTree({
 
         <div className="space-y-0.5">
           {rootFolders.length === 0 ? (
-            <p className="text-[11px] text-zinc-600 px-2 py-1">No folders created yet</p>
+            <p className="text-[11px] text-gray-400 dark:text-zinc-600 px-2 py-1">No folders created yet</p>
           ) : (
             rootFolders.map(rootFolder => renderFolderNode(rootFolder, 0))
           )}

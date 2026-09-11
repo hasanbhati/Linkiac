@@ -200,18 +200,19 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <h2 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
-            <Bookmark size={18} className="text-indigo-400" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-zinc-800">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+            <Bookmark size={18} className="text-[#093329] dark:text-[#BCD94E]" />
             <span>{editLink ? 'Edit Saved Link' : 'Save Anything to Linkiac'}</span>
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            aria-label="Close modal"
+            className="p-1 rounded-lg text-gray-400 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
           >
             <X size={18} />
           </button>
@@ -220,7 +221,7 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
           {error && (
-            <div className="p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl">
+            <div className="p-3 text-xs bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-xl">
               {error}
             </div>
           )}
@@ -228,14 +229,14 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
           {/* Raw Text / URL Input (Intentionally unconstrained) */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+              <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">
                 URL or Arbitrary Text *
               </label>
               <button
                 type="button"
                 onClick={handleFetchPreview}
                 disabled={isFetchingPreview || !url.trim()}
-                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="text-xs text-[#093329] hover:underline dark:text-[#BCD94E] dark:hover:text-[#a8c43f] font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isFetchingPreview ? (
                   <Loader2 size={12} className="animate-spin" />
@@ -251,13 +252,13 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
               placeholder="Paste any URL, broken link, reel text, or sentence..."
               value={url}
               onChange={e => handleUrlChange(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#093329]/20 dark:focus:ring-[#BCD94E]/30 dark:focus:border-[#BCD94E] font-mono shadow-xs"
             />
           </div>
 
           {/* Title */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
               Title (optional)
             </label>
             <input
@@ -265,13 +266,13 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
               placeholder="Give it a title or leave empty..."
               value={title}
               onChange={e => setTitle(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#093329]/20 dark:focus:ring-[#BCD94E]/30 dark:focus:border-[#BCD94E] shadow-xs"
             />
           </div>
 
           {/* Personal Comment */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
               Personal Note / Comment
             </label>
             <textarea
@@ -279,7 +280,7 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
               placeholder="Why are you saving this? Key takeaway..."
               value={comment}
               onChange={e => setComment(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#093329]/20 dark:focus:ring-[#BCD94E]/30 dark:focus:border-[#BCD94E] shadow-xs"
             />
           </div>
 
@@ -308,14 +309,14 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
           {/* Thumbnail / Visual Cover */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+              <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wider">
                 Thumbnail / Cover Image
               </label>
               {thumbnailUrl && (
                 <button
                   type="button"
                   onClick={() => setThumbnailUrl(null)}
-                  className="text-xs text-red-400 hover:text-red-300 font-medium inline-flex items-center gap-1"
+                  className="text-xs text-red-500 dark:text-red-400 hover:underline font-medium inline-flex items-center gap-1"
                 >
                   <Trash2 size={12} />
                   <span>Remove cover</span>
@@ -324,13 +325,13 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
             </div>
 
             {thumbnailError && (
-              <div className="p-2 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg">
+              <div className="p-2 text-xs bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 rounded-lg">
                 {thumbnailError}
               </div>
             )}
 
             {thumbnailUrl ? (
-              <div className="relative w-full h-36 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden group">
+              <div className="relative w-full h-36 bg-gray-100 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl overflow-hidden group">
                 <img
                   src={thumbnailUrl}
                   alt="Thumbnail preview"
@@ -341,7 +342,7 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingThumbnail}
-                    className="px-3 py-1.5 rounded-lg bg-zinc-900/90 text-white text-xs font-medium hover:bg-zinc-800 flex items-center gap-1.5 shadow"
+                    className="px-3 py-1.5 rounded-lg bg-white/95 dark:bg-zinc-900/90 text-gray-900 dark:text-white text-xs font-medium hover:bg-white dark:hover:bg-zinc-800 flex items-center gap-1.5 shadow"
                   >
                     {isUploadingThumbnail ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />}
                     <span>Replace Image</span>
@@ -362,12 +363,12 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploadingThumbnail}
-                  className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-2 transition-colors disabled:opacity-50 flex-shrink-0"
+                  className="px-3.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-zinc-200 text-xs font-medium flex items-center gap-2 transition-colors disabled:opacity-50 flex-shrink-0"
                 >
                   {isUploadingThumbnail ? (
-                    <Loader2 size={13} className="animate-spin text-indigo-400" />
+                    <Loader2 size={13} className="animate-spin text-[#093329] dark:text-[#BCD94E]" />
                   ) : (
-                    <Upload size={13} className="text-indigo-400" />
+                    <Upload size={13} className="text-[#093329] dark:text-[#BCD94E]" />
                   )}
                   <span>{isUploadingThumbnail ? 'Uploading...' : 'Upload Image'}</span>
                 </button>
@@ -377,7 +378,7 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
                     placeholder="Or paste direct image URL..."
                     value={thumbnailUrl || ''}
                     onChange={e => setThumbnailUrl(e.target.value || null)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                    className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#093329] dark:focus:ring-[#BCD94E] dark:focus:border-[#BCD94E] font-mono shadow-xs"
                   />
                 </div>
               </div>
@@ -393,17 +394,17 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
           </div>
 
           {/* Actions */}
-          <div className="pt-4 flex items-center justify-end gap-3 border-t border-zinc-800">
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-gray-100 dark:border-zinc-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 active:scale-95 transition-all"
+              className="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-[#093329] hover:bg-[#0d4739] dark:bg-[#BCD94E] dark:hover:bg-[#a8c43f] dark:text-[#093329] dark:font-bold shadow-md shadow-[#093329]/15 dark:shadow-[#BCD94E]/15 active:scale-95 transition-all"
             >
               {editLink ? 'Save Changes' : 'Save to Library'}
             </button>

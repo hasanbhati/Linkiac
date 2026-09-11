@@ -76,8 +76,8 @@ export function LinkCard({
     },
     reading: {
       label: 'Reading',
-      icon: <BookOpen size={12} className="text-indigo-400" />,
-      badgeClass: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+      icon: <BookOpen size={12} className="text-sky-400" />,
+      badgeClass: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
     },
     done: {
       label: 'Done',
@@ -94,16 +94,16 @@ export function LinkCard({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       className={`group relative rounded-2xl border transition-all duration-200 overflow-hidden flex flex-col cursor-grab active:cursor-grabbing ${
-        isDragging ? 'opacity-40 scale-[0.98] border-dashed border-indigo-400 shadow-2xl' : ''
+        isDragging ? 'opacity-40 scale-[0.98] border-dashed border-[#093329] dark:border-[#BCD94E] shadow-2xl' : ''
       } ${
         isSelected
-          ? 'bg-zinc-900 border-indigo-500 shadow-lg shadow-indigo-500/10 ring-2 ring-indigo-500/30'
-          : 'bg-zinc-900/80 hover:bg-zinc-900 border-zinc-800 hover:border-zinc-700/80 shadow-md'
+          ? 'bg-white dark:bg-zinc-900 border-[#093329] dark:border-[#BCD94E] shadow-lg shadow-[#093329]/10 dark:shadow-[#BCD94E]/10 ring-2 ring-[#093329]/20 dark:ring-[#BCD94E]/30'
+          : 'bg-white dark:bg-zinc-900/80 hover:bg-white dark:hover:bg-zinc-900 border-gray-200/90 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700/80 shadow-sm hover:shadow-md'
       }`}
     >
       {/* Multi-Item Dragging Badge */}
       {isDragging && isSelected && selectedCount > 1 && (
-        <div className="absolute top-2 right-2 z-30 bg-indigo-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-xl border border-white/20 animate-pulse">
+        <div className="absolute top-2 right-2 z-30 bg-[#093329] dark:bg-[#BCD94E] text-white dark:text-[#093329] text-[11px] font-bold px-2.5 py-1 rounded-full shadow-xl border border-white/20 animate-pulse">
           Moving {selectedCount} items
         </div>
       )}
@@ -115,10 +115,11 @@ export function LinkCard({
             e.stopPropagation();
             onToggleSelect(link.id);
           }}
+          aria-label={isSelected ? `Deselect ${link.title || 'link'}` : `Select ${link.title || 'link'}`}
           className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
             isSelected
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-950/80 backdrop-blur-md border border-white/20 text-transparent hover:border-white/50 group-hover:block'
+              ? 'bg-[#093329] text-white dark:bg-[#BCD94E] dark:text-[#093329]'
+              : 'bg-white/85 dark:bg-zinc-950/80 backdrop-blur-md border border-gray-300 dark:border-white/20 text-transparent hover:border-gray-500 group-hover:block shadow-sm'
           }`}
           title="Select link"
         >
@@ -130,39 +131,35 @@ export function LinkCard({
       {(() => {
         const effectiveThumbnail = link.thumbnail_url || extractDefaultThumbnail(link.url);
         return (
-          <div className="relative w-full h-44 bg-zinc-950/90 overflow-hidden">
+          <div className="relative w-full h-44 bg-gray-100 dark:bg-zinc-950/90 overflow-hidden">
             {effectiveThumbnail && !imageError ? (
               effectiveThumbnail.includes('google.com/s2/favicons') ? (
-                <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900">
-                  <div className="w-16 h-16 rounded-2xl bg-zinc-900/90 border border-zinc-700/60 p-3 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 dark:bg-zinc-900/60 p-6">
+                  <div className="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-800/80 border border-gray-200 dark:border-zinc-700 flex items-center justify-center shadow-md mb-2 group-hover:scale-105 transition-transform">
                     <img
                       src={effectiveThumbnail}
-                      alt={link.title || link.domain || 'Domain icon'}
-                      className="w-10 h-10 object-contain rounded"
+                      alt={link.title || link.url}
+                      className="w-8 h-8 object-contain"
                       onError={() => setImageError(true)}
-                      loading="lazy"
                     />
                   </div>
-                  {link.domain && (
-                    <span className="mt-2.5 text-xs text-zinc-400 font-medium tracking-wide font-mono">
-                      {link.domain}
-                    </span>
-                  )}
+                  <span className="text-[11px] font-mono text-gray-500 dark:text-zinc-500 truncate max-w-full">
+                    {new URL(ensureUrlProtocol(link.url)).hostname}
+                  </span>
                 </div>
               ) : (
                 <img
                   src={effectiveThumbnail}
-                  alt={link.title || 'Link preview thumbnail'}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  alt={link.title || link.url}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   onError={() => setImageError(true)}
-                  loading="lazy"
                 />
               )
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-zinc-900 to-zinc-950">
-                <Globe size={32} className="text-zinc-700 mb-2" />
-                <span className="text-xs text-zinc-500 font-mono line-clamp-1 max-w-[80%]">
-                  {link.domain || 'Note / Raw Text'}
+              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-zinc-900 dark:to-zinc-950 text-gray-400 dark:text-zinc-600">
+                <Globe size={32} className="opacity-40 mb-1.5" />
+                <span className="text-[11px] font-mono opacity-60">
+                  {isSafeWebUrl(link.url) ? new URL(ensureUrlProtocol(link.url)).hostname : 'Note'}
                 </span>
               </div>
             )}
@@ -172,6 +169,9 @@ export function LinkCard({
           <div className="relative">
             <button
               type="button"
+              aria-label={`Change reading status: currently ${currentStatus.label}`}
+              aria-haspopup="menu"
+              aria-expanded={showStatusMenu}
               onClick={e => {
                 e.stopPropagation();
                 setShowStatusMenu(!showStatusMenu);
@@ -183,7 +183,7 @@ export function LinkCard({
             </button>
 
             {showStatusMenu && (
-              <div className="absolute left-0 bottom-full mb-1.5 w-32 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl py-1 z-30">
+              <div className="absolute left-0 bottom-full mb-1.5 w-32 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl shadow-xl dark:shadow-2xl py-1 z-30">
                 {(['to_read', 'reading', 'done'] as ReadingStatus[]).map(statusKey => {
                   const item = statusConfig[statusKey];
                   return (
@@ -194,7 +194,7 @@ export function LinkCard({
                         e.stopPropagation();
                         handleStatusChange(statusKey);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800/80 hover:text-white text-left"
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800/80 hover:text-gray-900 dark:hover:text-white text-left"
                     >
                       {item.icon}
                       <span>{item.label}</span>
@@ -211,17 +211,20 @@ export function LinkCard({
           <div className="relative">
             <button
               type="button"
+              aria-label={`More options for ${link.title || link.url}`}
+              aria-haspopup="menu"
+              aria-expanded={showMenu}
               onClick={e => {
                 e.stopPropagation();
                 setShowMenu(!showMenu);
               }}
-              className="w-7 h-7 rounded-lg bg-zinc-950/80 backdrop-blur-md border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white transition-colors"
+              className="w-7 h-7 rounded-lg bg-white/85 dark:bg-zinc-950/80 backdrop-blur-md border border-gray-300 dark:border-white/10 flex items-center justify-center text-gray-700 dark:text-zinc-300 hover:text-gray-900 dark:hover:text-white shadow-sm transition-colors"
             >
               <MoreVertical size={15} />
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 mt-1 w-40 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl py-1 z-30 animate-fade-in text-xs">
+              <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl shadow-xl dark:shadow-2xl py-1 z-30 animate-fade-in text-xs">
                 <button
                   type="button"
                   onClick={e => {
@@ -229,9 +232,9 @@ export function LinkCard({
                     setShowMenu(false);
                     onSend(link);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-white text-left"
                 >
-                  <Send size={14} className="text-indigo-400" />
+                  <Send size={14} className="text-[#093329] dark:text-[#BCD94E]" />
                   <span>Send to Friend</span>
                 </button>
                 <button
@@ -241,9 +244,9 @@ export function LinkCard({
                     setShowMenu(false);
                     onMove(link);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-white text-left"
                 >
-                  <FolderInput size={14} className="text-amber-400" />
+                  <FolderInput size={14} className="text-amber-500" />
                   <span>Move to Folder...</span>
                 </button>
                 <button
@@ -253,12 +256,12 @@ export function LinkCard({
                     setShowMenu(false);
                     onEdit(link);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-white text-left"
                 >
-                  <Edit2 size={14} className="text-zinc-400" />
+                  <Edit2 size={14} className="text-gray-500 dark:text-zinc-400" />
                   <span>Edit Link</span>
                 </button>
-                <div className="my-1 border-t border-zinc-800/80" />
+                <div className="my-1 border-t border-gray-100 dark:border-zinc-800/80" />
                 <button
                   type="button"
                   onClick={e => {
@@ -268,7 +271,7 @@ export function LinkCard({
                       deleteLink(link.id);
                     }
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-red-400 hover:bg-red-500/10 text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-left"
                 >
                   <Trash2 size={14} />
                   <span>Delete</span>
@@ -285,7 +288,7 @@ export function LinkCard({
       <div className="p-4 flex-1 flex flex-col justify-between">
         <div>
           {/* Title or Raw text */}
-          <h3 className="font-semibold text-zinc-100 text-sm leading-snug line-clamp-2 mb-1.5 group-hover:text-indigo-300 transition-colors">
+          <h3 className="font-semibold text-gray-900 dark:text-zinc-100 text-sm leading-snug line-clamp-2 mb-1.5 group-hover:text-[#093329] dark:group-hover:text-[#BCD94E] transition-colors">
             {link.title || link.url}
           </h3>
 
@@ -296,20 +299,20 @@ export function LinkCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-indigo-400 font-mono truncate max-w-full mb-2 transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-500 hover:text-[#093329] dark:hover:text-[#BCD94E] font-mono truncate max-w-full mb-2 transition-colors"
             >
               <span className="truncate">{link.url}</span>
               <ExternalLink size={11} className="flex-shrink-0" />
             </a>
           ) : (
-            <p className="text-xs text-zinc-500 font-mono truncate mb-2 select-text" title={link.url}>
+            <p className="text-xs text-gray-500 dark:text-zinc-500 font-mono truncate mb-2 select-text" title={link.url}>
               {link.url}
             </p>
           )}
 
           {/* Personal Comment */}
           {link.comment && (
-            <p className="text-xs text-zinc-400 italic line-clamp-2 bg-zinc-950/50 p-2 rounded-lg border border-zinc-800/60 mb-2">
+            <p className="text-xs text-gray-600 dark:text-zinc-400 italic line-clamp-2 bg-gray-50 dark:bg-zinc-950/50 p-2 rounded-lg border border-gray-200/80 dark:border-zinc-800/60 mb-2">
               &quot;{link.comment}&quot;
             </p>
           )}

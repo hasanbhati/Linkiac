@@ -2,29 +2,78 @@
   "expo": {
     "name": "Linkiac",
     "slug": "linkiac",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#09090b"
+      "backgroundColor": "#093329"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.linkiac.app"
+      "bundleIdentifier": "eu.linkiac.app",
+      "buildNumber": "1",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Linkiac requires photo library access to allow you to select and upload custom avatar profile pictures.",
+        "NSCameraUsageDescription": "Linkiac requires camera access to allow you to capture a photo for your avatar profile picture."
+      },
+      "associatedDomains": [
+        "applinks:linkiac.eu",
+        "applinks:www.linkiac.eu",
+        "applinks:app.linkiac.eu"
+      ]
     },
     "android": {
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#09090b"
+        "backgroundColor": "#093329"
       },
-      "package": "com.linkiac.app",
-      "softwareKeyboardLayoutMode": "pan"
+      "package": "eu.linkiac.app",
+      "softwareKeyboardLayoutMode": "pan",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "linkiac.eu"
+            },
+            {
+              "scheme": "https",
+              "host": "www.linkiac.eu"
+            },
+            {
+              "scheme": "https",
+              "host": "app.linkiac.eu"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-apple-authentication",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0"
+          }
+        }
+      ],
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "scheme": "linkiac"
   }

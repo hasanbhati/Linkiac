@@ -13,8 +13,9 @@ import {
   Image,
 } from 'react-native';
 import { X, Bookmark, Check, Plus, Folder as FolderIcon } from 'lucide-react-native';
-import { ReadingStatus, extractDefaultThumbnail } from '@linkiac/shared';
+import { ReadingStatus, extractDefaultThumbnail, validatePreviewUrl } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface SaveLinkModalProps {
   visible: boolean;
@@ -23,6 +24,7 @@ interface SaveLinkModalProps {
 
 export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
   const { addLink, folders } = useApp();
+  const { theme, isDark } = useTheme();
 
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
@@ -61,11 +63,34 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
 
     const timer = setTimeout(async () => {
       try {
-        // Fast-path oEmbed for YouTube
-        if (raw.includes('youtube.com') || raw.includes('youtu.be')) {
-          const ytMatch = raw.match(/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
-          if (ytMatch && ytMatch[1]) {
-            const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(raw)}&format=json`);
+        const validation = validatePreviewUrl(raw);
+        if (!validation.safe) return;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        try {
+          // Fast-path oEmbed for YouTube
+          if (raw.includes('youtube.com') || raw.includes('youtu.be')) {
+            const ytMatch = raw.match(/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+            if (ytMatch && ytMatch[1]) {
+              const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(raw)}&format=json`, {
+                signal: controller.signal,
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (data.title && !title) setTitle(data.title);
+                if (data.thumbnail_url) setThumbnailUrl(data.thumbnail_url);
+                return;
+              }
+            }
+          }
+
+          // Fast-path oEmbed for Spotify
+          if (raw.includes('spotify.com')) {
+            const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(raw)}`, {
+              signal: controller.signal,
+            });
             if (res.ok) {
               const data = await res.json();
               if (data.title && !title) setTitle(data.title);
@@ -73,45 +98,37 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
               return;
             }
           }
-        }
 
-        // Fast-path oEmbed for Spotify
-        if (raw.includes('spotify.com')) {
-          const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(raw)}`);
+          // Direct HTML fetch using social crawler User-Agent
+          const res = await fetch(raw, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+              'Accept': 'text/html,application/xhtml+xml',
+            },
+          });
           if (res.ok) {
-            const data = await res.json();
-            if (data.title && !title) setTitle(data.title);
-            if (data.thumbnail_url) setThumbnailUrl(data.thumbnail_url);
-            return;
-          }
-        }
-
-        // Direct HTML fetch using social crawler User-Agent
-        const res = await fetch(raw, {
-          headers: {
-            'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
-            'Accept': 'text/html,application/xhtml+xml',
-          },
-        });
-        if (res.ok) {
-          const html = await res.text();
-          const titleMatch = html.substring(0, 200000).match(/<title[^>]*>([^<]+)<\/title>/i);
-          if (titleMatch && titleMatch[1] && !title) {
-            setTitle(titleMatch[1].trim());
-          }
-          const ogImg =
-            html.substring(0, 200000).match(/<meta[^>]+property=["']og:image(?::(?:url|secure_url))?["'][^>]+content=["']([^"']+)["']/i) ||
-            html.substring(0, 200000).match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::(?:url|secure_url))?["']/i) ||
-            html.substring(0, 200000).match(/<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i);
-          if (ogImg && ogImg[1]) {
-            let imgUrl = ogImg[1].trim();
-            if (!/^https?:\/\//i.test(imgUrl)) {
-              try {
-                imgUrl = new URL(imgUrl, raw).toString();
-              } catch {}
+            const html = await res.text();
+            const titleMatch = html.substring(0, 200000).match(/<title[^>]*>([^<]+)<\/title>/i);
+            if (titleMatch && titleMatch[1] && !title) {
+              setTitle(titleMatch[1].trim());
             }
-            setThumbnailUrl(imgUrl);
+            const ogImg =
+              html.substring(0, 200000).match(/<meta[^>]+property=["']og:image(?::(?:url|secure_url))?["'][^>]+content=["']([^"']+)["']/i) ||
+              html.substring(0, 200000).match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::(?:url|secure_url))?["']/i) ||
+              html.substring(0, 200000).match(/<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i);
+            if (ogImg && ogImg[1]) {
+              let imgUrl = ogImg[1].trim();
+              if (!/^https?:\/\//i.test(imgUrl)) {
+                try {
+                  imgUrl = new URL(imgUrl, raw).toString();
+                } catch {}
+              }
+              setThumbnailUrl(imgUrl);
+            }
           }
+        } finally {
+          clearTimeout(timeoutId);
         }
       } catch {
         // Fallback default thumbnail already set
@@ -163,19 +180,19 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
       >
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.headerLeft}>
-              <Bookmark color="#6366f1" size={20} />
-              <Text style={styles.modalTitle}>Save Link or Note</Text>
+              <Bookmark color={theme.accentPrimary} size={20} />
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Save Link or Note</Text>
             </View>
             <TouchableOpacity
               onPress={handleClose}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={styles.closeBtn}
             >
-              <X color="#a1a1aa" size={20} />
+              <X color={theme.textMuted} size={20} />
             </TouchableOpacity>
           </View>
 
@@ -193,13 +210,13 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
 
             {/* URL or Free Text */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>
                 URL or Note / Idea <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
-                style={[styles.input, styles.multilineInput]}
+                style={[styles.input, styles.multilineInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 placeholder="https://example.com, or paste an idea, snippet, or broken link"
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 value={url}
                 onChangeText={text => {
                   setUrl(text);
@@ -215,18 +232,18 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                 numberOfLines={3}
                 textAlignVertical="top"
               />
-              <Text style={styles.hint}>
+              <Text style={[styles.hint, { color: theme.textMuted }]}>
                 Accepts any web URL, article, or arbitrary text snippet.
               </Text>
             </View>
 
             {/* Title (Optional) */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Title (Optional)</Text>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>Title (Optional)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 placeholder="Give this link or note a memorable title"
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 value={title}
                 onChangeText={setTitle}
               />
@@ -234,11 +251,11 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
 
             {/* Personal Comment / Annotation */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Personal Note / Comment</Text>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>Personal Note / Comment</Text>
               <TextInput
-                style={[styles.input, styles.commentInput]}
+                style={[styles.input, styles.commentInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 placeholder="Why is this useful? Key takeaways or notes..."
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 value={comment}
                 onChangeText={setComment}
                 multiline
@@ -249,7 +266,7 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
 
             {/* Reading Status Selector */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Reading Status</Text>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>Reading Status</Text>
               <View style={styles.statusPills}>
                 {(
                   [
@@ -265,14 +282,20 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                       onPress={() => setReadingStatus(item.id)}
                       style={[
                         styles.statusPill,
-                        isSelected && styles.statusPillSelected,
+                        {
+                          backgroundColor: isSelected ? theme.accentPrimary : theme.surfaceSubtle,
+                          borderColor: isSelected ? theme.accentPrimary : theme.border,
+                        },
                       ]}
                     >
-                      {isSelected ? <Check color="#ffffff" size={14} style={{ marginRight: 4 }} /> : null}
+                      {isSelected ? <Check color={theme.accentText} size={14} style={{ marginRight: 4 }} /> : null}
                       <Text
                         style={[
                           styles.statusPillText,
-                          isSelected && styles.statusPillTextSelected,
+                          {
+                            color: isSelected ? theme.accentText : theme.textSecondary,
+                            fontWeight: isSelected ? '700' : '600',
+                          },
                         ]}
                       >
                         {item.label}
@@ -286,7 +309,7 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
             {/* Folder Selection */}
             {folders.length > 0 && (
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Folder (Optional)</Text>
+                <Text style={[styles.label, { color: theme.textPrimary }]}>Folder (Optional)</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -296,13 +319,19 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                     onPress={() => setSelectedFolderId(null)}
                     style={[
                       styles.folderChip,
-                      selectedFolderId === null && styles.folderChipSelected,
+                      {
+                        backgroundColor: selectedFolderId === null ? (isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)') : theme.surfaceSubtle,
+                        borderColor: selectedFolderId === null ? '#f59e0b' : theme.border,
+                      },
                     ]}
                   >
                     <Text
                       style={[
                         styles.folderChipText,
-                        selectedFolderId === null && styles.folderChipTextSelected,
+                        {
+                          color: selectedFolderId === null ? (isDark ? '#fbbf24' : '#b45309') : theme.textSecondary,
+                          fontWeight: selectedFolderId === null ? '600' : '500',
+                        },
                       ]}
                     >
                       None
@@ -317,18 +346,24 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
                         onPress={() => setSelectedFolderId(isSelected ? null : fld.id)}
                         style={[
                           styles.folderChip,
-                          isSelected && styles.folderChipSelected,
+                          {
+                            backgroundColor: isSelected ? (isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)') : theme.surfaceSubtle,
+                            borderColor: isSelected ? '#f59e0b' : theme.border,
+                          },
                         ]}
                       >
                         <FolderIcon
-                          color={isSelected ? '#ffffff' : '#f59e0b'}
+                          color={isSelected ? (isDark ? '#fbbf24' : '#b45309') : '#f59e0b'}
                           size={12}
                           style={{ marginRight: 4 }}
                         />
                         <Text
                           style={[
                             styles.folderChipText,
-                            isSelected && styles.folderChipTextSelected,
+                            {
+                              color: isSelected ? (isDark ? '#fbbf24' : '#b45309') : theme.textSecondary,
+                              fontWeight: isSelected ? '600' : '500',
+                            },
                           ]}
                         >
                           {fld.name}
@@ -343,24 +378,24 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
             {/* Thumbnail Preview & URL */}
             <View style={styles.inputGroup}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <Text style={styles.label}>Thumbnail / Cover Image</Text>
+                <Text style={[styles.label, { color: theme.textPrimary }]}>Thumbnail / Cover Image</Text>
                 {thumbnailUrl ? (
                   <TouchableOpacity onPress={() => setThumbnailUrl('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Remove</Text>
+                    <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '600' }}>Remove</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
 
               {thumbnailUrl ? (
-                <View style={styles.thumbnailPreviewContainer}>
+                <View style={[styles.thumbnailPreviewContainer, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
                   <Image source={{ uri: thumbnailUrl }} style={styles.thumbnailPreviewImg} resizeMode="cover" />
                 </View>
               ) : null}
 
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 placeholder="Auto-detected or paste custom image link..."
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 value={thumbnailUrl}
                 onChangeText={setThumbnailUrl}
                 autoCapitalize="none"
@@ -370,23 +405,23 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
           </ScrollView>
 
           {/* Action Buttons */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { borderTopColor: theme.border }]}>
             <TouchableOpacity
               onPress={handleClose}
-              style={styles.cancelBtn}
+              style={[styles.cancelBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
               disabled={isSaving}
             >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleSave}
-              style={styles.submitBtn}
+              style={[styles.submitBtn, { backgroundColor: theme.accentPrimary }]}
               disabled={isSaving}
             >
               {isSaving ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color={theme.accentText} />
               ) : (
-                <Text style={styles.submitBtnText}>Save to Library</Text>
+                <Text style={[styles.submitBtnText, { color: theme.accentText }]}>Save to Library</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -501,8 +536,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statusPillSelected: {
-    backgroundColor: '#4f46e5',
-    borderColor: '#6366f1',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
+    borderColor: '#BCD94E',
   },
   statusPillText: {
     color: '#a1a1aa',
@@ -526,7 +561,7 @@ const styles = StyleSheet.create({
   },
   folderChipSelected: {
     backgroundColor: '#27272a',
-    borderColor: '#818cf8',
+    borderColor: '#BCD94E',
   },
   folderChipText: {
     color: '#a1a1aa',
@@ -564,7 +599,6 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4f46e5',
     borderRadius: 10,
   },
   submitBtnText: {

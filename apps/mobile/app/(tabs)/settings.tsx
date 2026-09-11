@@ -27,16 +27,23 @@ import {
   X,
   Check,
   ChevronRight,
+  Sun,
+  Moon,
+  Smartphone,
+  FileText,
 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
 import { parseNetscapeBookmarks, generateNetscapeBookmarks } from '@linkiac/shared';
 import { useApp } from '../../src/context/AppContext';
+import { useTheme } from '../../src/context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 
 export default function MobileSettingsScreen() {
   const { currentUser, links, categories, folders, signOut, updateProfile, importBookmarks } = useApp();
+  const { theme, themeMode, setThemeMode } = useTheme();
 
   // User email
   const [userEmail, setUserEmail] = useState('');
@@ -66,6 +73,7 @@ export default function MobileSettingsScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Fetch email from Supabase Auth
   useEffect(() => {
@@ -250,16 +258,19 @@ export default function MobileSettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              setIsDeletingAccount(true);
               const { error } = await supabase.rpc('delete_user_account');
               if (error) {
-                await supabase.from('profiles').delete().eq('id', currentUser.id);
+                throw new Error(error.message || 'Failed to delete account.');
               }
               try {
                 await supabase.auth.signOut({ scope: 'global' });
               } catch {}
               await signOut();
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete account.');
+              Alert.alert('Deletion Failed', err.message || 'Failed to delete account. Please try again.');
+            } finally {
+              setIsDeletingAccount(false);
             }
           },
         },
@@ -393,13 +404,13 @@ export default function MobileSettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.heading}>Account & Settings</Text>
+    <ScrollView style={[styles.container, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.scrollContent}>
+      <Text style={[styles.heading, { color: theme.textPrimary }]}>Account & Settings</Text>
 
       {/* User Info Card */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <View style={styles.userRow}>
-          <View style={styles.avatar}>
+          <View style={[styles.avatar, { backgroundColor: theme.accentPrimary }]}>
             {currentUser.avatar_url ? (
               <Image source={{ uri: currentUser.avatar_url }} style={styles.avatarImg} />
             ) : (
@@ -407,118 +418,263 @@ export default function MobileSettingsScreen() {
             )}
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.displayName}>
+            <Text style={[styles.displayName, { color: theme.textPrimary }]}>
               {currentUser.display_name || `@${currentUser.username}`}
             </Text>
-            <Text style={styles.usernameText}>@{currentUser.username}</Text>
-            {userEmail ? <Text style={styles.emailText}>{userEmail}</Text> : null}
+            <Text style={[styles.usernameText, { color: theme.textSecondary }]}>@{currentUser.username}</Text>
+            {userEmail ? <Text style={[styles.emailText, { color: theme.textMuted }]}>{userEmail}</Text> : null}
             {currentUser.is_admin && (
-              <View style={styles.adminBadge}>
-                <Shield color="#818cf8" size={12} />
-                <Text style={styles.adminText}>Admin</Text>
+              <View style={[styles.adminBadge, { backgroundColor: theme.accentPrimaryMuted, borderColor: theme.accentPrimary }]}>
+                <Shield color={theme.accentPrimary} size={12} />
+                <Text style={[styles.adminText, { color: theme.accentPrimary }]}>Admin</Text>
               </View>
             )}
           </View>
 
           <TouchableOpacity
-            style={styles.editProfileBtn}
+            style={[styles.editProfileBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
             activeOpacity={0.8}
             onPress={() => setIsEditProfileOpen(true)}
           >
-            <Edit3 color="#a5b4fc" size={16} />
+            <Edit3 color={theme.textSecondary} size={16} />
           </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Appearance Section */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Appearance</Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, padding: 12, marginBottom: 0 }]}>
+          <View style={styles.themeSelectorContainer}>
+            {/* Light Option */}
+            <TouchableOpacity
+              style={[
+                styles.themeBtn,
+                {
+                  backgroundColor: themeMode === 'light' ? theme.accentPrimaryMuted : theme.surfaceSubtle,
+                  borderColor: themeMode === 'light' ? theme.accentPrimary : theme.border,
+                },
+              ]}
+              onPress={() => setThemeMode('light')}
+              activeOpacity={0.7}
+            >
+              <Sun color={themeMode === 'light' ? theme.accentPrimary : theme.textSecondary} size={20} />
+              <Text
+                style={[
+                  styles.themeBtnText,
+                  {
+                    color: themeMode === 'light' ? theme.accentPrimary : theme.textSecondary,
+                    fontWeight: themeMode === 'light' ? '700' : '500',
+                  },
+                ]}
+              >
+                Light
+              </Text>
+            </TouchableOpacity>
+
+            {/* Dark Option */}
+            <TouchableOpacity
+              style={[
+                styles.themeBtn,
+                {
+                  backgroundColor: themeMode === 'dark' ? theme.accentPrimaryMuted : theme.surfaceSubtle,
+                  borderColor: themeMode === 'dark' ? theme.accentPrimary : theme.border,
+                },
+              ]}
+              onPress={() => setThemeMode('dark')}
+              activeOpacity={0.7}
+            >
+              <Moon color={themeMode === 'dark' ? theme.accentPrimary : theme.textSecondary} size={20} />
+              <Text
+                style={[
+                  styles.themeBtnText,
+                  {
+                    color: themeMode === 'dark' ? theme.accentPrimary : theme.textSecondary,
+                    fontWeight: themeMode === 'dark' ? '700' : '500',
+                  },
+                ]}
+              >
+                Dark
+              </Text>
+            </TouchableOpacity>
+
+            {/* System Option */}
+            <TouchableOpacity
+              style={[
+                styles.themeBtn,
+                {
+                  backgroundColor: themeMode === 'system' ? theme.accentPrimaryMuted : theme.surfaceSubtle,
+                  borderColor: themeMode === 'system' ? theme.accentPrimary : theme.border,
+                },
+              ]}
+              onPress={() => setThemeMode('system')}
+              activeOpacity={0.7}
+            >
+              <Smartphone color={themeMode === 'system' ? theme.accentPrimary : theme.textSecondary} size={20} />
+              <Text
+                style={[
+                  styles.themeBtnText,
+                  {
+                    color: themeMode === 'system' ? theme.accentPrimary : theme.textSecondary,
+                    fontWeight: themeMode === 'system' ? '700' : '500',
+                  },
+                ]}
+              >
+                System
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
       {/* Account & Security Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account Security</Text>
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Account Security</Text>
 
         <TouchableOpacity
-          style={styles.row}
+          style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
           activeOpacity={0.7}
           onPress={() => setIsChangeEmailOpen(true)}
         >
           <View style={styles.rowLeft}>
-            <Mail color="#818cf8" size={18} />
+            <Mail color={theme.accentPrimary} size={18} />
             <View>
-              <Text style={styles.rowText}>Change Email</Text>
-              <Text style={styles.rowSubtext}>{userEmail || 'Update account email'}</Text>
+              <Text style={[styles.rowText, { color: theme.textPrimary }]}>Change Email</Text>
+              <Text style={[styles.rowSubtext, { color: theme.textMuted }]}>{userEmail || 'Update account email'}</Text>
             </View>
           </View>
-          <ChevronRight color="#52525b" size={16} />
+          <ChevronRight color={theme.textMuted} size={16} />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.row}
+          style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
           activeOpacity={0.7}
           onPress={() => setIsChangePasswordOpen(true)}
         >
           <View style={styles.rowLeft}>
-            <Lock color="#818cf8" size={18} />
+            <Lock color={theme.accentPrimary} size={18} />
             <View>
-              <Text style={styles.rowText}>Change Password</Text>
-              <Text style={styles.rowSubtext}>Update your password (min 8 chars)</Text>
+              <Text style={[styles.rowText, { color: theme.textPrimary }]}>Change Password</Text>
+              <Text style={[styles.rowSubtext, { color: theme.textMuted }]}>Update your password (min 8 chars)</Text>
             </View>
           </View>
-          <ChevronRight color="#52525b" size={16} />
+          <ChevronRight color={theme.textMuted} size={16} />
         </TouchableOpacity>
       </View>
 
       {/* Bookmarks & Data Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Bookmarks & Data</Text>
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Bookmarks & Data</Text>
         <TouchableOpacity
-          style={styles.row}
+          style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
           activeOpacity={0.7}
           onPress={handleImportBookmarks}
           disabled={isImporting}
         >
           <View style={styles.rowLeft}>
             {isImporting ? (
-              <ActivityIndicator size="small" color="#818cf8" />
+              <ActivityIndicator size="small" color={theme.accentPrimary} />
             ) : (
-              <Upload color="#818cf8" size={18} />
+              <Upload color={theme.accentPrimary} size={18} />
             )}
-            <Text style={styles.rowText}>
+            <Text style={[styles.rowText, { color: theme.textPrimary }]}>
               {isImporting ? 'Importing Bookmarks...' : 'Import Browser Bookmarks (.html)'}
             </Text>
           </View>
-          <ChevronRight color="#52525b" size={16} />
+          <ChevronRight color={theme.textMuted} size={16} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.row}
+          style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
           activeOpacity={0.7}
           onPress={handleExportBookmarks}
           disabled={isExporting}
         >
           <View style={styles.rowLeft}>
             {isExporting ? (
-              <ActivityIndicator size="small" color="#818cf8" />
+              <ActivityIndicator size="small" color={theme.accentPrimary} />
             ) : (
-              <Download color="#818cf8" size={18} />
+              <Download color={theme.accentPrimary} size={18} />
             )}
-            <Text style={styles.rowText}>
+            <Text style={[styles.rowText, { color: theme.textPrimary }]}>
               {isExporting ? 'Exporting Library...' : 'Export My Library (.html)'}
             </Text>
           </View>
-          <ChevronRight color="#52525b" size={16} />
+          <ChevronRight color={theme.textMuted} size={16} />
         </TouchableOpacity>
+      </View>
+
+      {/* About & Legal Section (App Store Guideline 5.1.1 & 1.2 Compliance) */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>About & Legal</Text>
+        <TouchableOpacity
+          style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
+          activeOpacity={0.7}
+          onPress={() => WebBrowser.openBrowserAsync('https://linkiac.eu/privacy')}
+        >
+          <View style={styles.rowLeft}>
+            <Shield color={theme.accentPrimary} size={18} />
+            <Text style={[styles.rowText, { color: theme.textPrimary }]}>Privacy Policy</Text>
+          </View>
+          <ChevronRight color={theme.textMuted} size={16} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
+          activeOpacity={0.7}
+          onPress={() => WebBrowser.openBrowserAsync('https://linkiac.eu/terms')}
+        >
+          <View style={styles.rowLeft}>
+            <FileText color={theme.accentPrimary} size={18} />
+            <Text style={[styles.rowText, { color: theme.textPrimary }]}>Terms of Service & EULA</Text>
+          </View>
+          <ChevronRight color={theme.textMuted} size={16} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
+          activeOpacity={0.7}
+          onPress={() => WebBrowser.openBrowserAsync('https://linkiac.eu/cookies')}
+        >
+          <View style={styles.rowLeft}>
+            <FileText color={theme.accentPrimary} size={18} />
+            <Text style={[styles.rowText, { color: theme.textPrimary }]}>Cookie Policy</Text>
+          </View>
+          <ChevronRight color={theme.textMuted} size={16} />
+        </TouchableOpacity>
+
+        <View style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.rowLeft}>
+            <Smartphone color={theme.textMuted} size={18} />
+            <Text style={[styles.rowText, { color: theme.textPrimary }]}>Version</Text>
+          </View>
+          <Text style={[styles.versionText, { color: theme.textMuted }]}>1.0.0 (Build 1)</Text>
+        </View>
       </View>
 
       {/* Account Actions Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account Actions</Text>
-        <TouchableOpacity style={styles.row} activeOpacity={0.7} onPress={handleLogout}>
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Account Actions</Text>
+        <TouchableOpacity style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]} activeOpacity={0.7} onPress={handleLogout}>
           <View style={styles.rowLeft}>
-            <LogOut color="#a1a1aa" size={18} />
-            <Text style={styles.rowText}>Sign Out</Text>
+            <LogOut color={theme.textMuted} size={18} />
+            <Text style={[styles.rowText, { color: theme.textPrimary }]}>Sign Out</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.dangerRow} activeOpacity={0.7} onPress={handleDeleteAccount}>
+        <TouchableOpacity
+          style={[styles.dangerRow, { backgroundColor: theme.dangerBg, borderColor: theme.danger }, isDeletingAccount && { opacity: 0.6 }]}
+          activeOpacity={0.7}
+          onPress={handleDeleteAccount}
+          disabled={isDeletingAccount}
+        >
           <View style={styles.rowLeft}>
-            <Trash2 color="#ef4444" size={18} />
-            <Text style={styles.dangerText}>Delete Account (Danger Zone)</Text>
+            {isDeletingAccount ? (
+              <ActivityIndicator size="small" color={theme.danger} />
+            ) : (
+              <Trash2 color={theme.danger} size={18} />
+            )}
+            <Text style={[styles.dangerText, { color: theme.danger }]}>
+              {isDeletingAccount ? 'Deleting Account...' : 'Delete Account (Danger Zone)'}
+            </Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -526,45 +682,45 @@ export default function MobileSettingsScreen() {
       {/* Edit Profile Modal */}
       <Modal visible={isEditProfileOpen} animationType="slide" transparent onRequestClose={() => setIsEditProfileOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Edit Profile</Text>
               <TouchableOpacity onPress={() => setIsEditProfileOpen(false)}>
-                <X color="#a1a1aa" size={20} />
+                <X color={theme.textMuted} size={20} />
               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
               {/* Device Photo Upload & Live Avatar Preview */}
               <View style={styles.modalAvatarSection}>
-                <View style={styles.modalAvatarWrapper}>
+                <View style={[styles.modalAvatarWrapper, { backgroundColor: theme.accentPrimaryMuted, borderColor: theme.accentPrimary }]}>
                   {editAvatarUrl ? (
                     <Image source={{ uri: editAvatarUrl }} style={styles.avatarImg} />
                   ) : (
-                    <User color="#ffffff" size={32} />
+                    <User color={theme.accentPrimary} size={32} />
                   )}
                   <TouchableOpacity
-                    style={styles.modalAvatarCameraBadge}
+                    style={[styles.modalAvatarCameraBadge, { backgroundColor: theme.accentPrimary, borderColor: theme.surface }]}
                     activeOpacity={0.8}
                     onPress={handlePickAvatarPhoto}
                     disabled={isUploadingPhoto}
                   >
-                    <Camera color="#ffffff" size={13} />
+                    <Camera color={theme.accentText} size={13} />
                   </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity
-                  style={styles.uploadDevicePhotoBtn}
+                  style={[styles.uploadDevicePhotoBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
                   activeOpacity={0.8}
                   onPress={handlePickAvatarPhoto}
                   disabled={isUploadingPhoto}
                 >
                   {isUploadingPhoto ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
+                    <ActivityIndicator size="small" color={theme.accentPrimary} />
                   ) : (
                     <>
-                      <Upload color="#ffffff" size={14} />
-                      <Text style={styles.uploadDevicePhotoBtnText}>
+                      <Upload color={theme.textPrimary} size={14} />
+                      <Text style={[styles.uploadDevicePhotoBtnText, { color: theme.textPrimary }]}>
                         {editAvatarUrl ? 'Change Photo from Device' : 'Upload Photo from Device'}
                       </Text>
                     </>
@@ -573,35 +729,35 @@ export default function MobileSettingsScreen() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>USERNAME</Text>
-                <View style={styles.usernameInputWrap}>
-                  <Text style={styles.atSymbol}>@</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>USERNAME</Text>
+                <View style={[styles.usernameInputWrap, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+                  <Text style={[styles.atSymbol, { color: theme.textMuted }]}>@</Text>
                   <TextInput
-                    style={styles.usernameInput}
+                    style={[styles.usernameInput, { color: theme.textPrimary }]}
                     value={editUsername}
                     onChangeText={t => setEditUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                     placeholder="your_username"
-                    placeholderTextColor="#52525b"
+                    placeholderTextColor={theme.textMuted}
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
                 </View>
-                <Text style={styles.inputHint}>Unique handle for sharing links (min 3 chars).</Text>
+                <Text style={[styles.inputHint, { color: theme.textMuted }]}>Unique handle for sharing links (min 3 chars).</Text>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>DISPLAY NAME</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>DISPLAY NAME</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                   value={editDisplayName}
                   onChangeText={setEditDisplayName}
                   placeholder="e.g. Alex Curator"
-                  placeholderTextColor="#52525b"
+                  placeholderTextColor={theme.textMuted}
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PROFILE PICTURE / AVATAR</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>PROFILE PICTURE / AVATAR</Text>
                 {(() => {
                   const isStorageAvatar = !!(
                     editAvatarUrl &&
@@ -611,10 +767,10 @@ export default function MobileSettingsScreen() {
 
                   if (isStorageAvatar) {
                     return (
-                      <View style={styles.uploadedPhotoBadge}>
+                      <View style={[styles.uploadedPhotoBadge, { backgroundColor: theme.accentPrimaryMuted, borderColor: theme.accentPrimary }]}>
                         <View style={styles.uploadedPhotoBadgeLeft}>
-                          <Check color="#34d399" size={14} />
-                          <Text style={styles.uploadedPhotoBadgeText}>
+                          <Check color={theme.accentPrimary} size={14} />
+                          <Text style={[styles.uploadedPhotoBadgeText, { color: theme.textPrimary }]}>
                             Custom photo uploaded from device
                           </Text>
                         </View>
@@ -630,17 +786,17 @@ export default function MobileSettingsScreen() {
 
                   return (
                     <TextInput
-                      style={styles.textInput}
+                      style={[styles.textInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                       value={editAvatarUrl}
                       onChangeText={setEditAvatarUrl}
                       placeholder="Or paste external image URL (https://...)"
-                      placeholderTextColor="#52525b"
+                      placeholderTextColor={theme.textMuted}
                       autoCapitalize="none"
                       autoCorrect={false}
                     />
                   );
                 })()}
-                <Text style={styles.inputHint}>
+                <Text style={[styles.inputHint, { color: theme.textMuted }]}>
                   {editAvatarUrl &&
                   (editAvatarUrl.includes('/storage/v1/object/public/avatars') ||
                     editAvatarUrl.includes('/avatars/'))
@@ -650,11 +806,11 @@ export default function MobileSettingsScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, (isSavingProfile || isUploadingPhoto) && styles.btnDisabled]}
+                style={[styles.modalSubmitBtn, { backgroundColor: theme.accentPrimary }, (isSavingProfile || isUploadingPhoto) && styles.btnDisabled]}
                 disabled={isSavingProfile || isUploadingPhoto}
                 onPress={handleSaveProfile}
               >
-                {isSavingProfile ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.modalSubmitBtnText}>Save Profile Changes</Text>}
+                {isSavingProfile ? <ActivityIndicator color={theme.accentText} size="small" /> : <Text style={[styles.modalSubmitBtnText, { color: theme.accentText }]}>Save Profile Changes</Text>}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -664,27 +820,27 @@ export default function MobileSettingsScreen() {
       {/* Change Email Modal */}
       <Modal visible={isChangeEmailOpen} animationType="slide" transparent onRequestClose={() => setIsChangeEmailOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Change Email Address</Text>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Change Email Address</Text>
               <TouchableOpacity onPress={() => setIsChangeEmailOpen(false)}>
-                <X color="#a1a1aa" size={20} />
+                <X color={theme.textMuted} size={20} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalBody}>
-              <Text style={styles.modalDesc}>
+              <Text style={[styles.modalDesc, { color: theme.textSecondary }]}>
                 A confirmation link will be sent to your new email address to verify the change.
               </Text>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>NEW EMAIL ADDRESS</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>NEW EMAIL ADDRESS</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                   value={newEmail}
                   onChangeText={setNewEmail}
                   placeholder="new-email@example.com"
-                  placeholderTextColor="#52525b"
+                  placeholderTextColor={theme.textMuted}
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoCorrect={false}
@@ -692,11 +848,11 @@ export default function MobileSettingsScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, isSavingEmail && styles.btnDisabled]}
+                style={[styles.modalSubmitBtn, { backgroundColor: theme.accentPrimary }, isSavingEmail && styles.btnDisabled]}
                 disabled={isSavingEmail}
                 onPress={handleUpdateEmail}
               >
-                {isSavingEmail ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.modalSubmitBtnText}>Send Confirmation Email</Text>}
+                {isSavingEmail ? <ActivityIndicator color={theme.accentText} size="small" /> : <Text style={[styles.modalSubmitBtnText, { color: theme.accentText }]}>Send Confirmation Email</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -706,57 +862,57 @@ export default function MobileSettingsScreen() {
       {/* Change Password Modal */}
       <Modal visible={isChangePasswordOpen} animationType="slide" transparent onRequestClose={() => setIsChangePasswordOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Change Password</Text>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Change Password</Text>
               <TouchableOpacity onPress={() => setIsChangePasswordOpen(false)}>
-                <X color="#a1a1aa" size={20} />
+                <X color={theme.textMuted} size={20} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalBody}>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>CURRENT PASSWORD</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
                   placeholder="••••••••"
-                  placeholderTextColor="#52525b"
+                  placeholderTextColor={theme.textMuted}
                   secureTextEntry
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>NEW PASSWORD (MIN 8 CHARACTERS)</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>NEW PASSWORD (MIN 8 CHARACTERS)</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   placeholder="••••••••"
-                  placeholderTextColor="#52525b"
+                  placeholderTextColor={theme.textMuted}
                   secureTextEntry
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>CONFIRM NEW PASSWORD</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>CONFIRM NEW PASSWORD</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="••••••••"
-                  placeholderTextColor="#52525b"
+                  placeholderTextColor={theme.textMuted}
                   secureTextEntry
                 />
               </View>
 
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, isSavingPassword && styles.btnDisabled]}
+                style={[styles.modalSubmitBtn, { backgroundColor: theme.accentPrimary }, isSavingPassword && styles.btnDisabled]}
                 disabled={isSavingPassword}
                 onPress={handleUpdatePassword}
               >
-                {isSavingPassword ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.modalSubmitBtnText}>Update Password</Text>}
+                {isSavingPassword ? <ActivityIndicator color={theme.accentText} size="small" /> : <Text style={[styles.modalSubmitBtnText, { color: theme.accentText }]}>Update Password</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -798,7 +954,6 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#4f46e5',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -840,9 +995,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.3)',
+    borderColor: 'rgba(188, 217, 78, 0.3)',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -850,7 +1005,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   adminText: {
-    color: '#818cf8',
+    color: '#BCD94E',
     fontSize: 10,
     fontWeight: '700',
   },
@@ -989,7 +1144,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   modalSubmitBtn: {
-    backgroundColor: '#4f46e5',
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
@@ -1013,12 +1167,10 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#312e81',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     borderWidth: 2,
-    borderColor: '#4f46e5',
     overflow: 'visible',
   },
   modalAvatarCameraBadge: {
@@ -1028,7 +1180,6 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#4f46e5',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -1076,5 +1227,27 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 12,
     fontWeight: '600',
+  },
+  themeSelectorContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  themeBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  themeBtnText: {
+    fontSize: 12,
+  },
+  versionText: {
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });

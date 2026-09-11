@@ -10,6 +10,19 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        brand: {
+          lime: '#BCD94E',
+          'lime-hover': '#a8c43f',
+          'lime-light': '#eef5d3',
+          'lime-muted': 'rgba(188, 217, 78, 0.15)',
+          deep: '#093329',
+          'deep-hover': '#0c4336',
+          'deep-surface': '#121916',
+          'deep-subtle': '#18221e',
+          'deep-border': '#20332a',
+          dark: '#111827',
+          canvas: '#F9FAFB',
+        },
         indigo: {
           50: '#eef2ff',
           100: '#e0e7ff',

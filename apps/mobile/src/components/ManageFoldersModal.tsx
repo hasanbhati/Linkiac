@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { X, Folder, FolderPlus, Trash2, Plus, ChevronRight, Layers } from 'lucide-react-native';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface ManageFoldersModalProps {
   visible: boolean;
@@ -21,6 +22,7 @@ interface ManageFoldersModalProps {
 
 export function ManageFoldersModal({ visible, onClose }: ManageFoldersModalProps) {
   const { folders, links, categories, addFolder, deleteFolder, addCategory, deleteCategory } = useApp();
+  const { theme, isDark } = useTheme();
 
   // Active sub-tab in modal
   const [modalTab, setModalTab] = useState<'folders' | 'categories'>('folders');
@@ -111,51 +113,57 @@ export function ManageFoldersModal({ visible, onClose }: ManageFoldersModalProps
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.overlay}
       >
-        <View style={styles.content}>
+        <View style={[styles.content, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.titleRow}>
               {modalTab === 'folders' ? (
                 <Folder color="#f59e0b" size={20} />
               ) : (
-                <Layers color="#818cf8" size={20} />
+                <Layers color={theme.accentPrimary} size={20} />
               )}
-              <Text style={styles.title}>
+              <Text style={[styles.title, { color: theme.textPrimary }]}>
                 {modalTab === 'folders' ? 'Manage Folders' : 'Manage Categories'}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X color="#a1a1aa" size={20} />
+              <X color={theme.textMuted} size={20} />
             </TouchableOpacity>
           </View>
 
           {/* Segmented Tab Switcher */}
-          <View style={styles.segmentedControl}>
+          <View style={[styles.segmentedControl, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
             <TouchableOpacity
-              style={[styles.segmentBtn, modalTab === 'folders' && styles.segmentBtnActive]}
+              style={[
+                styles.segmentBtn,
+                modalTab === 'folders' ? { backgroundColor: theme.surface } : { backgroundColor: 'transparent' }
+              ]}
               onPress={() => setModalTab('folders')}
               activeOpacity={0.8}
             >
               <Folder
-                color={modalTab === 'folders' ? '#ffffff' : '#a1a1aa'}
+                color={modalTab === 'folders' ? '#f59e0b' : theme.textMuted}
                 size={14}
                 style={{ marginRight: 6 }}
               />
-              <Text style={[styles.segmentText, modalTab === 'folders' && styles.segmentTextActive]}>
+              <Text style={[styles.segmentText, { color: modalTab === 'folders' ? theme.textPrimary : theme.textSecondary, fontWeight: modalTab === 'folders' ? '700' : '500' }]}>
                 Folders ({folders.length})
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.segmentBtn, modalTab === 'categories' && styles.segmentBtnActive]}
+              style={[
+                styles.segmentBtn,
+                modalTab === 'categories' ? { backgroundColor: theme.surface } : { backgroundColor: 'transparent' }
+              ]}
               onPress={() => setModalTab('categories')}
               activeOpacity={0.8}
             >
               <Layers
-                color={modalTab === 'categories' ? '#ffffff' : '#a1a1aa'}
+                color={modalTab === 'categories' ? theme.accentPrimary : theme.textMuted}
                 size={14}
                 style={{ marginRight: 6 }}
               />
-              <Text style={[styles.segmentText, modalTab === 'categories' && styles.segmentTextActive]}>
+              <Text style={[styles.segmentText, { color: modalTab === 'categories' ? theme.textPrimary : theme.textSecondary, fontWeight: modalTab === 'categories' ? '700' : '500' }]}>
                 Categories ({categories.length})
               </Text>
             </TouchableOpacity>
@@ -165,12 +173,12 @@ export function ManageFoldersModal({ visible, onClose }: ManageFoldersModalProps
             {modalTab === 'folders' ? (
               <View style={styles.section}>
                 {/* Create Folder Box */}
-                <View style={styles.createBox}>
-                  <Text style={styles.createLabel}>CREATE NEW FOLDER</Text>
+                <View style={[styles.createBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+                  <Text style={[styles.createLabel, { color: theme.textMuted }]}>CREATE NEW FOLDER</Text>
                   <TextInput
-                    style={[styles.input, { marginBottom: 10 }]}
+                    style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.textPrimary, marginBottom: 10 }]}
                     placeholder="Folder name (e.g. Articles, Dev Tools)..."
-                    placeholderTextColor="#71717a"
+                    placeholderTextColor={theme.textMuted}
                     value={newFolderName}
                     onChangeText={setNewFolderName}
                   />
@@ -178,32 +186,59 @@ export function ManageFoldersModal({ visible, onClose }: ManageFoldersModalProps
                   {/* Optional Category Picker */}
                   {categories.length > 0 && (
                     <View style={styles.catPickerRow}>
-                      <Text style={styles.catPickerLabel}>Assign to Category (Optional):</Text>
+                      <Text style={[styles.catPickerLabel, { color: theme.textMuted }]}>Assign to Category (Optional):</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catChips}>
                         <TouchableOpacity
-                          style={[styles.catChip, folderCategoryId === null && styles.catChipActive]}
+                          style={[
+                            styles.catChip,
+                            {
+                              backgroundColor: folderCategoryId === null ? theme.accentPrimaryMuted : theme.surface,
+                              borderColor: folderCategoryId === null ? theme.accentPrimary : theme.border,
+                            }
+                          ]}
                           onPress={() => setFolderCategoryId(null)}
                         >
-                          <Text style={[styles.catChipText, folderCategoryId === null && styles.catChipTextActive]}>
+                          <Text style={[
+                            styles.catChipText,
+                            {
+                              color: folderCategoryId === null ? theme.accentPrimary : theme.textSecondary,
+                              fontWeight: folderCategoryId === null ? '600' : '400',
+                            }
+                          ]}>
                             No Category
                           </Text>
                         </TouchableOpacity>
-                        {categories.map(c => (
-                          <TouchableOpacity
-                            key={c.id}
-                            style={[styles.catChip, folderCategoryId === c.id && styles.catChipActive]}
-                            onPress={() => setFolderCategoryId(c.id)}
-                          >
-                            <Layers
-                              color={folderCategoryId === c.id ? '#ffffff' : '#818cf8'}
-                              size={12}
-                              style={{ marginRight: 4 }}
-                            />
-                            <Text style={[styles.catChipText, folderCategoryId === c.id && styles.catChipTextActive]}>
-                              {c.name}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                        {categories.map(c => {
+                          const isCatSelected = folderCategoryId === c.id;
+                          return (
+                            <TouchableOpacity
+                              key={c.id}
+                              style={[
+                                styles.catChip,
+                                {
+                                  backgroundColor: isCatSelected ? theme.accentPrimaryMuted : theme.surface,
+                                  borderColor: isCatSelected ? theme.accentPrimary : theme.border,
+                                }
+                              ]}
+                              onPress={() => setFolderCategoryId(c.id)}
+                            >
+                              <Layers
+                                color={isCatSelected ? theme.accentPrimary : theme.textMuted}
+                                size={12}
+                                style={{ marginRight: 4 }}
+                              />
+                              <Text style={[
+                                styles.catChipText,
+                                {
+                                  color: isCatSelected ? theme.accentPrimary : theme.textSecondary,
+                                  fontWeight: isCatSelected ? '600' : '400',
+                                }
+                              ]}>
+                                {c.name}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </ScrollView>
                     </View>
                   )}
@@ -211,51 +246,78 @@ export function ManageFoldersModal({ visible, onClose }: ManageFoldersModalProps
                   {/* Optional parent folder picker for nesting */}
                   {folders.length > 0 && (
                     <View style={styles.catPickerRow}>
-                      <Text style={styles.catPickerLabel}>Nest under parent folder (Optional):</Text>
+                      <Text style={[styles.catPickerLabel, { color: theme.textMuted }]}>Nest under parent folder (Optional):</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catChips}>
                         <TouchableOpacity
-                          style={[styles.catChip, parentFolderId === null && styles.catChipActive]}
+                          style={[
+                            styles.catChip,
+                            {
+                              backgroundColor: parentFolderId === null ? theme.accentPrimaryMuted : theme.surface,
+                              borderColor: parentFolderId === null ? theme.accentPrimary : theme.border,
+                            }
+                          ]}
                           onPress={() => setParentFolderId(null)}
                         >
-                          <Text style={[styles.catChipText, parentFolderId === null && styles.catChipTextActive]}>
+                          <Text style={[
+                            styles.catChipText,
+                            {
+                              color: parentFolderId === null ? theme.accentPrimary : theme.textSecondary,
+                              fontWeight: parentFolderId === null ? '600' : '400',
+                            }
+                          ]}>
                             Root Folder
                           </Text>
                         </TouchableOpacity>
-                        {folders.map(f => (
-                          <TouchableOpacity
-                            key={f.id}
-                            style={[styles.catChip, parentFolderId === f.id && styles.catChipActive]}
-                            onPress={() => setParentFolderId(f.id)}
-                          >
-                            <Folder
-                              color={parentFolderId === f.id ? '#ffffff' : '#f59e0b'}
-                              size={12}
-                              style={{ marginRight: 4 }}
-                            />
-                            <Text style={[styles.catChipText, parentFolderId === f.id && styles.catChipTextActive]}>
-                              {f.name}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                        {folders.map(f => {
+                          const isFolderSelected = parentFolderId === f.id;
+                          return (
+                            <TouchableOpacity
+                              key={f.id}
+                              style={[
+                                styles.catChip,
+                                {
+                                  backgroundColor: isFolderSelected ? (isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)') : theme.surface,
+                                  borderColor: isFolderSelected ? '#f59e0b' : theme.border,
+                                }
+                              ]}
+                              onPress={() => setParentFolderId(f.id)}
+                            >
+                              <Folder
+                                color={isFolderSelected ? (isDark ? '#fbbf24' : '#b45309') : '#f59e0b'}
+                                size={12}
+                                style={{ marginRight: 4 }}
+                              />
+                              <Text style={[
+                                styles.catChipText,
+                                {
+                                  color: isFolderSelected ? (isDark ? '#fbbf24' : '#b45309') : theme.textSecondary,
+                                  fontWeight: isFolderSelected ? '600' : '400',
+                                }
+                              ]}>
+                                {f.name}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </ScrollView>
                     </View>
                   )}
 
                   <TouchableOpacity
-                    style={[styles.folderSubmitBtn, !newFolderName.trim() && styles.btnDisabled]}
+                    style={[styles.folderSubmitBtn, { backgroundColor: theme.accentPrimary }, !newFolderName.trim() && styles.btnDisabled]}
                     disabled={!newFolderName.trim() || isCreatingFolder}
                     onPress={handleCreateFolder}
                   >
-                    <FolderPlus color="#ffffff" size={16} />
-                    <Text style={styles.folderSubmitBtnText}>Create Folder</Text>
+                    <FolderPlus color={theme.accentText} size={16} />
+                    <Text style={[styles.folderSubmitBtnText, { color: theme.accentText }]}>Create Folder</Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Folder List */}
-                <Text style={styles.listHeader}>EXISTING FOLDERS ({folders.length})</Text>
+                <Text style={[styles.listHeader, { color: theme.textMuted }]}>EXISTING FOLDERS ({folders.length})</Text>
                 {folders.length === 0 ? (
                   <View style={styles.emptyBox}>
-                    <Text style={styles.emptyText}>No folders created yet.</Text>
+                    <Text style={[styles.emptyText, { color: theme.textMuted }]}>No folders created yet.</Text>
                   </View>
                 ) : (
                   folders.map(folder => {
@@ -263,14 +325,14 @@ export function ManageFoldersModal({ visible, onClose }: ManageFoldersModalProps
                     const parentName = folders.find(f => f.id === folder.parent_folder_id)?.name;
                     const catName = categories.find(c => c.id === folder.category_id)?.name;
                     return (
-                      <View key={folder.id} style={styles.itemRow}>
+                      <View key={folder.id} style={[styles.itemRow, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
                         <View style={styles.itemLeft}>
                           <View style={styles.itemIconFolder}>
                             <Folder color="#f59e0b" size={16} />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={styles.itemName}>{folder.name}</Text>
-                            <Text style={styles.itemSub} numberOfLines={1}>
+                            <Text style={[styles.itemName, { color: theme.textPrimary }]}>{folder.name}</Text>
+                            <Text style={[styles.itemSub, { color: theme.textMuted }]} numberOfLines={1}>
                               {count} {count === 1 ? 'link' : 'links'}
                               {catName ? ` • Category: ${catName}` : ''}
                               {parentName ? ` • in ${parentName}` : ' • Root'}
@@ -282,7 +344,7 @@ export function ManageFoldersModal({ visible, onClose }: ManageFoldersModalProps
                           onPress={() => handleDeleteFolder(folder.id, folder.name)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                          <Trash2 color="#ef4444" size={16} />
+                          <Trash2 color={theme.danger} size={16} />
                         </TouchableOpacity>
                       </View>
                     );
@@ -292,45 +354,45 @@ export function ManageFoldersModal({ visible, onClose }: ManageFoldersModalProps
             ) : (
               <View style={styles.section}>
                 {/* Create Category Box */}
-                <View style={styles.createBox}>
-                  <Text style={styles.createLabel}>CREATE NEW CATEGORY</Text>
+                <View style={[styles.createBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+                  <Text style={[styles.createLabel, { color: theme.textMuted }]}>CREATE NEW CATEGORY</Text>
                   <TextInput
-                    style={[styles.input, { marginBottom: 10 }]}
+                    style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.textPrimary, marginBottom: 10 }]}
                     placeholder="Category name (e.g. Work, Tech, Personal)..."
-                    placeholderTextColor="#71717a"
+                    placeholderTextColor={theme.textMuted}
                     value={newCategoryName}
                     onChangeText={setNewCategoryName}
                   />
 
                   <TouchableOpacity
-                    style={[styles.folderSubmitBtn, !newCategoryName.trim() && styles.btnDisabled]}
+                    style={[styles.folderSubmitBtn, { backgroundColor: theme.accentPrimary }, !newCategoryName.trim() && styles.btnDisabled]}
                     disabled={!newCategoryName.trim() || isCreatingCategory}
                     onPress={handleCreateCategory}
                   >
-                    <Plus color="#ffffff" size={16} />
-                    <Text style={styles.folderSubmitBtnText}>Create Category</Text>
+                    <Plus color={theme.accentText} size={16} />
+                    <Text style={[styles.folderSubmitBtnText, { color: theme.accentText }]}>Create Category</Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Category List */}
-                <Text style={styles.listHeader}>EXISTING CATEGORIES ({categories.length})</Text>
+                <Text style={[styles.listHeader, { color: theme.textMuted }]}>EXISTING CATEGORIES ({categories.length})</Text>
                 {categories.length === 0 ? (
                   <View style={styles.emptyBox}>
-                    <Text style={styles.emptyText}>No categories created yet.</Text>
+                    <Text style={[styles.emptyText, { color: theme.textMuted }]}>No categories created yet.</Text>
                   </View>
                 ) : (
                   categories.map(category => {
                     const folderCount = folders.filter(f => f.category_id === category.id).length;
                     const directLinksCount = links.filter(l => l.category_id === category.id).length;
                     return (
-                      <View key={category.id} style={styles.itemRow}>
+                      <View key={category.id} style={[styles.itemRow, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
                         <View style={styles.itemLeft}>
                           <View style={styles.itemIconCategory}>
-                            <Layers color="#818cf8" size={16} />
+                            <Layers color={theme.accentPrimary} size={16} />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={styles.itemName}>{category.name}</Text>
-                            <Text style={styles.itemSub}>
+                            <Text style={[styles.itemName, { color: theme.textPrimary }]}>{category.name}</Text>
+                            <Text style={[styles.itemSub, { color: theme.textMuted }]}>
                               {folderCount} {folderCount === 1 ? 'folder' : 'folders'} • {directLinksCount} direct links
                             </Text>
                           </View>
@@ -340,7 +402,7 @@ export function ManageFoldersModal({ visible, onClose }: ManageFoldersModalProps
                           onPress={() => handleDeleteCategory(category.id, category.name)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                          <Trash2 color="#ef4444" size={16} />
+                          <Trash2 color={theme.danger} size={16} />
                         </TouchableOpacity>
                       </View>
                     );
@@ -427,7 +489,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#4f46e5',
     borderRadius: 10,
     paddingVertical: 10,
   },
@@ -462,8 +523,8 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
   },
   catChipActive: {
-    backgroundColor: '#4f46e5',
-    borderColor: '#6366f1',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
+    borderColor: '#BCD94E',
   },
   catChipText: {
     color: '#a1a1aa',

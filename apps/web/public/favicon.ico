@@ -1,0 +1,7 @@
+<svg id="favicon-32" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+                            <g transform="translate(10, 20)">
+                                <rect x="35" y="10" width="65" height="65" rx="32.5" fill="none" stroke="#093329" stroke-width="20"></rect>
+                                <rect x="0" y="10" width="65" height="65" rx="32.5" fill="none" stroke="#bcd94e" stroke-width="20"></rect>
+                                <path d="M 35 42.5 A 32.5 32.5 0 0 1 67.5 10" fill="none" stroke="#093329" stroke-width="20" stroke-linecap="round"></path>
+                            </g>
+                        </svg>

@@ -16,6 +16,7 @@ import {
 import { X, Send, User, Check, ExternalLink } from 'lucide-react-native';
 import { Link } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface SendLinkToFriendsModalProps {
   visible: boolean;
@@ -31,6 +32,7 @@ export function SendLinkToFriendsModal({
   onSuccess,
 }: SendLinkToFriendsModalProps) {
   const { currentUser, friends, sendLinkToFriends } = useApp();
+  const { theme, isDark } = useTheme();
   const [selectedRecipientIds, setSelectedRecipientIds] = useState<Set<string>>(new Set());
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
@@ -136,12 +138,12 @@ export function SendLinkToFriendsModal({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
       >
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.headerLeft}>
-              <Send color="#6366f1" size={18} />
-              <Text style={styles.headerTitle}>
+              <Send color={theme.accentPrimary} size={18} />
+              <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
                 Send {links.length} Link{links.length === 1 ? '' : 's'} to Friend
               </Text>
             </View>
@@ -149,7 +151,7 @@ export function SendLinkToFriendsModal({
               onPress={onClose}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <X color="#a1a1aa" size={20} />
+              <X color={theme.textMuted} size={20} />
             </TouchableOpacity>
           </View>
 
@@ -160,36 +162,36 @@ export function SendLinkToFriendsModal({
           >
             {/* Selected Link(s) Preview */}
             <View style={styles.previewSection}>
-              <Text style={styles.sectionLabel}>SELECTED LINK{links.length === 1 ? '' : 'S'}</Text>
+              <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>SELECTED LINK{links.length === 1 ? '' : 'S'}</Text>
               {links.length === 1 ? (
-                <View style={styles.singleLinkCard}>
+                <View style={[styles.singleLinkCard, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
                   <View style={styles.titleHeaderRow}>
-                    <Text style={styles.titleHeaderLabel}>LINK TITLE</Text>
-                    <Text style={styles.titleHeaderHint}>Keep or edit before sending</Text>
+                    <Text style={[styles.titleHeaderLabel, { color: theme.textSecondary }]}>LINK TITLE</Text>
+                    <Text style={[styles.titleHeaderHint, { color: theme.textMuted }]}>Keep or edit before sending</Text>
                   </View>
                   <TextInput
-                    style={styles.titleInput}
+                    style={[styles.titleInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.textPrimary }]}
                     placeholder="Title for this link..."
-                    placeholderTextColor="#71717a"
+                    placeholderTextColor={theme.textMuted}
                     value={title}
                     onChangeText={setTitle}
                     autoCapitalize="sentences"
                     returnKeyType="done"
                   />
-                  <Text style={styles.singleLinkUrl} numberOfLines={1}>
+                  <Text style={[styles.singleLinkUrl, { color: theme.textSecondary }]} numberOfLines={1}>
                     {links[0].url}
                   </Text>
                   {links[0].domain && (
                     <View style={styles.domainBadge}>
-                      <ExternalLink color="#818cf8" size={10} />
-                      <Text style={styles.domainBadgeText}>{links[0].domain}</Text>
+                      <ExternalLink color={theme.accentPrimary} size={10} />
+                      <Text style={[styles.domainBadgeText, { color: theme.accentPrimary }]}>{links[0].domain}</Text>
                     </View>
                   )}
                 </View>
               ) : (
-                <View style={styles.multiLinksCard}>
-                  <Text style={styles.multiLinksCount}>{links.length} links selected</Text>
-                  <Text style={styles.multiLinksSub}>
+                <View style={[styles.multiLinksCard, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+                  <Text style={[styles.multiLinksCount, { color: theme.textPrimary }]}>{links.length} links selected</Text>
+                  <Text style={[styles.multiLinksSub, { color: theme.textSecondary }]}>
                     {links.map(l => l.title || l.domain || l.url).slice(0, 3).join(', ')}
                     {links.length > 3 ? ` and ${links.length - 3} more` : ''}
                   </Text>
@@ -199,12 +201,12 @@ export function SendLinkToFriendsModal({
 
             {/* Friend Selector */}
             <View style={styles.recipientSection}>
-              <Text style={styles.sectionLabel}>CHOOSE RECIPIENT(S) *</Text>
+              <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>CHOOSE RECIPIENT(S) *</Text>
               {acceptedFriends.length === 0 ? (
                 <View style={styles.emptyFriendsBox}>
-                  <User color="#52525b" size={24} />
-                  <Text style={styles.emptyFriendsTitle}>No friends connected yet</Text>
-                  <Text style={styles.emptyFriendsSub}>
+                  <User color={theme.textMuted} size={24} />
+                  <Text style={[styles.emptyFriendsTitle, { color: theme.textPrimary }]}>No friends connected yet</Text>
+                  <Text style={[styles.emptyFriendsSub, { color: theme.textMuted }]}>
                     Add friends in the Friends tab to recommend links to them directly.
                   </Text>
                 </View>
@@ -217,7 +219,8 @@ export function SendLinkToFriendsModal({
                         key={friend.recipientId}
                         style={[
                           styles.friendItem,
-                          isSelected && styles.friendItemSelected,
+                          { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                          isSelected && { backgroundColor: theme.accentPrimaryMuted, borderColor: theme.accentPrimary },
                         ]}
                         activeOpacity={0.7}
                         onPress={() => toggleRecipient(friend.recipientId)}
@@ -227,16 +230,16 @@ export function SendLinkToFriendsModal({
                             {friend.avatarUrl ? (
                               <Image source={{ uri: friend.avatarUrl }} style={styles.avatarImg} />
                             ) : (
-                              <User color="#a5b4fc" size={14} />
+                              <User color={theme.accentPrimary} size={14} />
                             )}
                           </View>
                           <View>
-                            <Text style={styles.friendUsername}>@{friend.username}</Text>
-                            <Text style={styles.friendDisplayName}>{friend.displayName}</Text>
+                            <Text style={[styles.friendUsername, { color: theme.textPrimary }]}>@{friend.username}</Text>
+                            <Text style={[styles.friendDisplayName, { color: theme.textMuted }]}>{friend.displayName}</Text>
                           </View>
                         </View>
-                        <View style={[styles.checkCircle, isSelected && styles.checkCircleActive]}>
-                          {isSelected && <Check color="#ffffff" size={13} strokeWidth={3} />}
+                        <View style={[styles.checkCircle, { borderColor: theme.textMuted }, isSelected && { backgroundColor: theme.accentPrimary, borderColor: theme.accentPrimary }]}>
+                          {isSelected && <Check color={theme.accentText} size={13} strokeWidth={3} />}
                         </View>
                       </TouchableOpacity>
                     );
@@ -247,11 +250,11 @@ export function SendLinkToFriendsModal({
 
             {/* Optional Personal Note */}
             <View style={styles.noteSection}>
-              <Text style={styles.sectionLabel}>PERSONAL NOTE / WHY ARE YOU SHARING? (OPTIONAL)</Text>
+              <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>PERSONAL NOTE / WHY ARE YOU SHARING? (OPTIONAL)</Text>
               <TextInput
-                style={styles.noteInput}
+                style={[styles.noteInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 placeholder="Add a note or comment for your friend..."
-                placeholderTextColor="#71717a"
+                placeholderTextColor={theme.textMuted}
                 value={comment}
                 onChangeText={setComment}
                 multiline
@@ -262,29 +265,30 @@ export function SendLinkToFriendsModal({
           </ScrollView>
 
           {/* Footer */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { borderTopColor: theme.border }]}>
             <TouchableOpacity
               onPress={onClose}
-              style={styles.cancelBtn}
+              style={[styles.cancelBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
               disabled={isSending}
             >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleSend}
               style={[
                 styles.sendBtn,
+                { backgroundColor: theme.accentPrimary },
                 (isSending || selectedRecipientIds.size === 0) && styles.sendBtnDisabled,
               ]}
               disabled={isSending || selectedRecipientIds.size === 0}
             >
               {isSending ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color={theme.accentText} />
               ) : (
                 <>
-                  <Send color="#ffffff" size={15} />
-                  <Text style={styles.sendBtnText}>
+                  <Send color={theme.accentText} size={15} />
+                  <Text style={[styles.sendBtnText, { color: theme.accentText }]}>
                     Send to {selectedRecipientIds.size > 0 ? `${selectedRecipientIds.size} Friend${selectedRecipientIds.size === 1 ? '' : 's'}` : 'Friend'}
                   </Text>
                 </>
@@ -396,14 +400,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     alignSelf: 'flex-start',
   },
   domainBadgeText: {
-    color: '#818cf8',
+    color: '#BCD94E',
     fontSize: 11,
     fontWeight: '500',
   },
@@ -462,8 +466,8 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
   },
   friendItemSelected: {
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
-    borderColor: '#6366f1',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
+    borderColor: '#BCD94E',
   },
   friendLeft: {
     flexDirection: 'row',
@@ -475,7 +479,6 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#312e81',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -503,8 +506,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkCircleActive: {
-    backgroundColor: '#6366f1',
-    borderColor: '#6366f1',
+    backgroundColor: '#BCD94E',
+    borderColor: '#BCD94E',
   },
   noteSection: {
     marginBottom: 10,
@@ -550,7 +553,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#4f46e5',
     borderRadius: 10,
   },
   sendBtnDisabled: {

@@ -28,6 +28,8 @@ import {
 } from 'lucide-react-native';
 import { Link, ReadingStatus, isSafeWebUrl, ensureUrlProtocol, extractDefaultThumbnail } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
+
 interface LinkDetailModalProps {
   visible: boolean;
   link: Link | null;
@@ -37,6 +39,7 @@ interface LinkDetailModalProps {
 
 export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: LinkDetailModalProps) {
   const { updateLink, deleteLink, folders } = useApp();
+  const { theme, isDark } = useTheme();
 
   if (!link) return null;
 
@@ -96,16 +99,16 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.headerLeft}>
               {isWebUrl ? (
-                <Globe color="#818cf8" size={18} />
+                <Globe color={theme.accentPrimary} size={18} />
               ) : (
-                <BookOpen color="#a1a1aa" size={18} />
+                <BookOpen color={theme.textMuted} size={18} />
               )}
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <Text style={[styles.headerTitle, { color: theme.textSecondary }]} numberOfLines={1}>
                 {isWebUrl ? 'Web Link' : 'Saved Note'}
               </Text>
             </View>
@@ -114,7 +117,7 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={styles.closeBtn}
             >
-              <X color="#a1a1aa" size={20} />
+              <X color={theme.textMuted} size={20} />
             </TouchableOpacity>
           </View>
 
@@ -125,7 +128,7 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
               if (!effectiveThumbnail) return null;
               const isFavicon = effectiveThumbnail.includes('google.com/s2/favicons');
               return (
-                <View style={[styles.detailThumbnailContainer, isFavicon && styles.detailFaviconContainer]}>
+                <View style={[styles.detailThumbnailContainer, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, isFavicon && styles.detailFaviconContainer]}>
                   <Image
                     source={{ uri: effectiveThumbnail }}
                     style={isFavicon ? styles.detailFaviconImg : styles.detailThumbnailImg}
@@ -137,35 +140,35 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
 
             {/* Title */}
             {link.title ? (
-              <Text style={styles.title}>{link.title}</Text>
+              <Text style={[styles.title, { color: theme.textPrimary }]}>{link.title}</Text>
             ) : null}
 
             {/* URL or Content */}
-            <View style={styles.contentBox}>
-              <Text style={styles.contentLabel}>
+            <View style={[styles.contentBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+              <Text style={[styles.contentLabel, { color: theme.textMuted }]}>
                 {isWebUrl ? 'Destination URL' : 'Content / Snippet'}
               </Text>
-              <Text style={styles.contentText} selectable>
+              <Text style={[styles.contentText, { color: theme.textPrimary }]} selectable>
                 {link.url}
               </Text>
             </View>
 
             {/* Comment */}
             {link.comment ? (
-              <View style={styles.commentBox}>
-                <Text style={styles.commentLabel}>Personal Note</Text>
-                <Text style={styles.commentText}>"{link.comment}"</Text>
+              <View style={[styles.commentBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+                <Text style={[styles.commentLabel, { color: theme.textMuted }]}>Personal Note</Text>
+                <Text style={[styles.commentText, { color: theme.textSecondary }]}>"{link.comment}"</Text>
               </View>
             ) : null}
 
             {/* Status pills */}
             <View style={styles.statusSection}>
-              <Text style={styles.sectionLabel}>Reading Status</Text>
+              <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>Reading Status</Text>
               <View style={styles.statusRow}>
                 {(
                   [
                     { id: 'to_read', label: 'To Read', icon: Clock, color: '#f59e0b' },
-                    { id: 'reading', label: 'Reading', icon: BookOpen, color: '#6366f1' },
+                    { id: 'reading', label: 'Reading', icon: BookOpen, color: isDark ? '#38bdf8' : '#0284c7' },
                     { id: 'done', label: 'Done', icon: CheckCircle2, color: '#10b981' },
                   ] as const
                 ).map(item => {
@@ -177,17 +180,23 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
                       onPress={() => handleStatusChange(item.id)}
                       style={[
                         styles.statusBtn,
-                        isSelected && { borderColor: item.color, backgroundColor: `${item.color}20` },
+                        {
+                          backgroundColor: isSelected ? `${item.color}20` : theme.surfaceSubtle,
+                          borderColor: isSelected ? item.color : theme.border,
+                        },
                       ]}
                     >
                       <Icon
-                        color={isSelected ? item.color : '#71717a'}
+                        color={isSelected ? item.color : theme.textMuted}
                         size={14}
                       />
                       <Text
                         style={[
                           styles.statusBtnText,
-                          isSelected && { color: '#fafafa', fontWeight: '700' },
+                          {
+                            color: isSelected ? (isDark ? '#fafafa' : item.color) : theme.textSecondary,
+                            fontWeight: isSelected ? '700' : '500',
+                          },
                         ]}
                       >
                         {item.label}
@@ -201,13 +210,29 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
             {/* Folder */}
             {folders.length > 0 && (
               <View style={styles.categorizeSection}>
-                <Text style={styles.sectionLabel}>Folder</Text>
+                <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>Folder</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
                   <TouchableOpacity
                     onPress={() => updateLink(link.id, { folder_id: null })}
-                    style={[styles.smallChip, !link.folder_id && styles.smallChipActive]}
+                    style={[
+                      styles.smallChip,
+                      {
+                        backgroundColor: !link.folder_id ? theme.accentPrimaryMuted : theme.surfaceSubtle,
+                        borderColor: !link.folder_id ? theme.accentPrimary : theme.border,
+                      },
+                    ]}
                   >
-                    <Text style={[styles.smallChipText, !link.folder_id && styles.smallChipTextActive]}>None</Text>
+                    <Text
+                      style={[
+                        styles.smallChipText,
+                        {
+                          color: !link.folder_id ? theme.accentPrimary : theme.textSecondary,
+                          fontWeight: !link.folder_id ? '600' : '500',
+                        },
+                      ]}
+                    >
+                      None
+                    </Text>
                   </TouchableOpacity>
                   {folders.map(f => {
                     const isSelected = link.folder_id === f.id;
@@ -215,10 +240,26 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
                       <TouchableOpacity
                         key={f.id}
                         onPress={() => updateLink(link.id, { folder_id: isSelected ? null : f.id })}
-                        style={[styles.smallChip, isSelected && styles.smallChipActive]}
+                        style={[
+                          styles.smallChip,
+                          {
+                            backgroundColor: isSelected ? theme.accentPrimaryMuted : theme.surfaceSubtle,
+                            borderColor: isSelected ? theme.accentPrimary : theme.border,
+                          },
+                        ]}
                       >
-                        <Folder color={isSelected ? '#ffffff' : '#f59e0b'} size={11} style={{ marginRight: 4 }} />
-                        <Text style={[styles.smallChipText, isSelected && styles.smallChipTextActive]}>{f.name}</Text>
+                        <Folder color={isSelected ? theme.accentPrimary : '#f59e0b'} size={11} style={{ marginRight: 4 }} />
+                        <Text
+                          style={[
+                            styles.smallChipText,
+                            {
+                              color: isSelected ? theme.accentPrimary : theme.textSecondary,
+                              fontWeight: isSelected ? '600' : '500',
+                            },
+                          ]}
+                        >
+                          {f.name}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -227,26 +268,26 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
             )}
 
             {/* Meta info */}
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText}>
+            <View style={[styles.metaRow, { borderTopColor: theme.border }]}>
+              <Text style={[styles.metaText, { color: theme.textMuted }]}>
                 Saved on {new Date(link.created_at).toLocaleDateString()}
               </Text>
               {link.domain ? (
-                <Text style={styles.metaDomain}>{link.domain}</Text>
+                <Text style={[styles.metaDomain, { color: theme.accentPrimary }]}>{link.domain}</Text>
               ) : null}
             </View>
           </ScrollView>
 
           {/* Action Footer (Redesigned 2-Tier Layout) */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { borderTopColor: theme.border }]}>
             {isWebUrl ? (
               <TouchableOpacity
                 onPress={handleOpenBrowser}
-                style={styles.openBrowserBtn}
+                style={[styles.openBrowserBtn, { backgroundColor: theme.accentPrimary }]}
                 activeOpacity={0.8}
               >
-                <ExternalLink color="#ffffff" size={16} />
-                <Text style={styles.openBrowserBtnText}>Open in Browser</Text>
+                <ExternalLink color={theme.accentText} size={16} />
+                <Text style={[styles.openBrowserBtnText, { color: theme.accentText }]}>Open in Browser</Text>
               </TouchableOpacity>
             ) : null}
 
@@ -257,29 +298,29 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
                     onShareToFriends(link);
                   }
                 }}
-                style={styles.actionIconBtn}
+                style={[styles.actionIconBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
                 activeOpacity={0.7}
               >
-                <Send color="#818cf8" size={15} />
-                <Text style={styles.actionBtnLabel}>Send</Text>
+                <Send color={theme.accentPrimary} size={15} />
+                <Text style={[styles.actionBtnLabel, { color: theme.textPrimary }]}>Send</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={handleShare}
-                style={styles.actionIconBtn}
+                style={[styles.actionIconBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
                 activeOpacity={0.7}
               >
-                <Share2 color="#d4d4d8" size={15} />
-                <Text style={styles.actionBtnLabel}>Share</Text>
+                <Share2 color={theme.textSecondary} size={15} />
+                <Text style={[styles.actionBtnLabel, { color: theme.textPrimary }]}>Share</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={handleDelete}
-                style={styles.deleteBtn}
+                style={[styles.deleteBtn, { backgroundColor: theme.dangerBg, borderColor: theme.danger }]}
                 activeOpacity={0.7}
               >
-                <Trash2 color="#ef4444" size={15} />
-                <Text style={styles.deleteBtnLabel}>Delete</Text>
+                <Trash2 color={theme.danger} size={15} />
+                <Text style={[styles.deleteBtnLabel, { color: theme.danger }]}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -428,15 +469,15 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
   },
   smallChipActive: {
-    backgroundColor: '#312e81',
-    borderColor: '#6366f1',
+    backgroundColor: 'rgba(188, 217, 78, 0.15)',
+    borderColor: '#BCD94E',
   },
   smallChipText: {
     color: '#a1a1aa',
     fontSize: 11,
   },
   smallChipTextActive: {
-    color: '#c7d2fe',
+    color: '#BCD94E',
     fontWeight: '600',
   },
   metaRow: {
@@ -451,7 +492,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   metaDomain: {
-    color: '#818cf8',
+    color: '#BCD94E',
     fontSize: 11,
     fontWeight: '500',
   },
@@ -469,12 +510,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     height: 46,
-    backgroundColor: '#4f46e5',
     borderRadius: 12,
-    shadowColor: '#4f46e5',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
     elevation: 3,
   },
   openBrowserBtnText: {

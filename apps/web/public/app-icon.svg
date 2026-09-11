@@ -1,0 +1,9 @@
+<svg id="app-icon" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" width="160" height="160">
+                            <!-- Background shape standard for icons -->
+                            <rect width="256" height="256" rx="60" fill="#000000"></rect>
+                            <g transform="translate(73, 83)">
+                                <rect x="45" y="15" width="80" height="80" rx="40" fill="none" stroke="#093329" stroke-width="20"></rect>
+                                <rect x="0" y="15" width="80" height="80" rx="40" fill="none" stroke="#bcd94e" stroke-width="20"></rect>
+                                <path d="M 45 55 A 40 40 0 0 1 85 15" fill="none" stroke="#093329" stroke-width="20" stroke-linecap="round"></path>
+                            </g>
+                        </svg>

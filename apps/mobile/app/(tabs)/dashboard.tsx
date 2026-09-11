@@ -2,9 +2,11 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { Globe, BarChart2, Bookmark, Clock, BookOpen, CheckCircle2 } from 'lucide-react-native';
 import { useApp } from '../../src/context/AppContext';
+import { useTheme } from '../../src/context/ThemeContext';
 
 export default function MobileDashboardScreen() {
   const { links, domainStats, syncAllFromSupabase } = useApp();
+  const { theme } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
@@ -24,78 +26,78 @@ export default function MobileDashboardScreen() {
 
   const renderHeader = () => (
     <View style={styles.headerSection}>
-      <Text style={styles.heading}>Personal Analytics</Text>
-      <Text style={styles.subheading}>Reading progression & domain habits across your library</Text>
+      <Text style={[styles.heading, { color: theme.textPrimary }]}>Personal Analytics</Text>
+      <Text style={[styles.subheading, { color: theme.textSecondary }]}>Reading progression & domain habits across your library</Text>
 
       {/* Metric Cards 2x2 Grid */}
       <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.statLabelRow}>
-            <Bookmark color="#818cf8" size={13} />
-            <Text style={styles.statLabel}>TOTAL LINKS</Text>
+            <Bookmark color={theme.accentPrimary} size={13} />
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>TOTAL LINKS</Text>
           </View>
-          <Text style={styles.statNumber}>{totalCount}</Text>
-          <Text style={styles.statHint}>Saved in library</Text>
+          <Text style={[styles.statNumber, { color: theme.textPrimary }]}>{totalCount}</Text>
+          <Text style={[styles.statHint, { color: theme.textMuted }]}>Saved in library</Text>
         </View>
 
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.statLabelRow}>
             <Clock color="#f59e0b" size={13} />
-            <Text style={styles.statLabel}>TO READ</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>TO READ</Text>
           </View>
           <Text style={[styles.statNumber, { color: '#f59e0b' }]}>{toReadCount}</Text>
-          <Text style={styles.statHint}>{totalCount > 0 ? Math.round(toReadPct) : 0}% of library</Text>
+          <Text style={[styles.statHint, { color: theme.textMuted }]}>{totalCount > 0 ? Math.round(toReadPct) : 0}% of library</Text>
         </View>
 
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.statLabelRow}>
-            <BookOpen color="#818cf8" size={13} />
-            <Text style={styles.statLabel}>READING</Text>
+            <BookOpen color={theme.accentPrimary} size={13} />
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>READING</Text>
           </View>
-          <Text style={[styles.statNumber, { color: '#818cf8' }]}>{readingCount}</Text>
-          <Text style={styles.statHint}>In progress</Text>
+          <Text style={[styles.statNumber, { color: theme.accentPrimary }]}>{readingCount}</Text>
+          <Text style={[styles.statHint, { color: theme.textMuted }]}>In progress</Text>
         </View>
 
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.statLabelRow}>
-            <CheckCircle2 color="#34d399" size={13} />
-            <Text style={styles.statLabel}>COMPLETED</Text>
+            <CheckCircle2 color="#10b981" size={13} />
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>COMPLETED</Text>
           </View>
-          <Text style={[styles.statNumber, { color: '#34d399' }]}>{doneCount}</Text>
-          <Text style={styles.statHint}>{totalCount > 0 ? Math.round(donePct) : 0}% completion</Text>
+          <Text style={[styles.statNumber, { color: '#10b981' }]}>{doneCount}</Text>
+          <Text style={[styles.statHint, { color: theme.textMuted }]}>{totalCount > 0 ? Math.round(donePct) : 0}% completion</Text>
         </View>
       </View>
 
       {/* Progress Distribution Bar */}
-      <View style={styles.progressCard}>
-        <Text style={styles.progressTitle}>Reading Status Distribution</Text>
-        <View style={styles.progressBar}>
+      <View style={[styles.progressCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.progressTitle, { color: theme.textPrimary }]}>Reading Status Distribution</Text>
+        <View style={[styles.progressBar, { backgroundColor: theme.surfaceSubtle }]}>
           <View style={[styles.progressSegment, { width: `${toReadPct}%`, backgroundColor: '#f59e0b' }]} />
-          <View style={[styles.progressSegment, { width: `${readingPct}%`, backgroundColor: '#6366f1' }]} />
+          <View style={[styles.progressSegment, { width: `${readingPct}%`, backgroundColor: theme.accentPrimary }]} />
           <View style={[styles.progressSegment, { width: `${donePct}%`, backgroundColor: '#10b981' }]} />
         </View>
         <View style={styles.progressLegend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
-            <Text style={styles.legendText}>To Read ({toReadCount})</Text>
+            <Text style={[styles.legendText, { color: theme.textSecondary }]}>To Read ({toReadCount})</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#6366f1' }]} />
-            <Text style={styles.legendText}>Reading ({readingCount})</Text>
+            <View style={[styles.legendDot, { backgroundColor: theme.accentPrimary }]} />
+            <Text style={[styles.legendText, { color: theme.textSecondary }]}>Reading ({readingCount})</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
-            <Text style={styles.legendText}>Done ({doneCount})</Text>
+            <Text style={[styles.legendText, { color: theme.textSecondary }]}>Done ({doneCount})</Text>
           </View>
         </View>
       </View>
 
-      <Text style={styles.sectionHeader}>MOST FREQUENT DOMAINS</Text>
+      <Text style={[styles.sectionHeader, { color: theme.textMuted }]}>MOST FREQUENT DOMAINS</Text>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.canvas }]}>
       <FlatList
         data={domainStats}
         keyExtractor={item => item.domain}
@@ -104,28 +106,28 @@ export default function MobileDashboardScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#6366f1"
-            colors={['#6366f1']}
+            tintColor={theme.accentPrimary}
+            colors={[theme.accentPrimary]}
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <BarChart2 color="#3f3f46" size={48} />
-            <Text style={styles.emptyTitle}>No domain analytics yet</Text>
-            <Text style={styles.emptySubtitle}>
+            <BarChart2 color={theme.textMuted} size={48} />
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No domain analytics yet</Text>
+            <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>
               Save web links to see analytics and domain frequency breakdown.
             </Text>
           </View>
         }
         renderItem={({ item, index }) => (
-          <View style={styles.row}>
+          <View style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.domainInfo}>
-              <Text style={styles.rank}>#{index + 1}</Text>
-              <Globe color="#818cf8" size={16} />
-              <Text style={styles.domainName} numberOfLines={1}>{item.domain}</Text>
+              <Text style={[styles.rank, { color: theme.textMuted }]}>#{index + 1}</Text>
+              <Globe color={theme.accentPrimary} size={16} />
+              <Text style={[styles.domainName, { color: theme.textPrimary }]} numberOfLines={1}>{item.domain}</Text>
             </View>
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>
+            <View style={[styles.countBadge, { backgroundColor: theme.surfaceSubtle }]}>
+              <Text style={[styles.countText, { color: theme.textSecondary }]}>
                 {item.count} {item.count === 1 ? 'link' : 'links'}
               </Text>
             </View>

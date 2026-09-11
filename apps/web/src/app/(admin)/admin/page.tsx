@@ -143,7 +143,7 @@ export default function AdminPage() {
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mb-3" />
+        <Loader2 className="w-8 h-8 text-[#BCD94E] animate-spin mb-3" />
         <p className="text-xs text-zinc-500 font-mono">Verifying authorization...</p>
       </div>
     );
@@ -287,10 +287,10 @@ export default function AdminPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100 flex items-center gap-2.5">
-                  <Shield size={22} className="text-indigo-400" />
+                  <Shield size={22} className="text-[#BCD94E]" />
                   <span>Operator Admin Panel</span>
                 </h1>
-                <span className="text-[10px] font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-semibold bg-[#BCD94E]/15 text-[#BCD94E] border border-[#BCD94E]/30 px-2 py-0.5 rounded-full">
                   Privileged Access
                 </span>
               </div>
@@ -305,13 +305,13 @@ export default function AdminPage() {
               disabled={isLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold disabled:opacity-50 transition-colors self-start sm:self-auto"
             >
-              <RefreshCw size={13} className={isLoading ? 'animate-spin text-indigo-400' : ''} />
+              <RefreshCw size={13} className={isLoading ? 'animate-spin text-[#BCD94E]' : ''} />
               <span>Refresh Data</span>
             </button>
           </div>
 
           {actionNotice && (
-            <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold flex items-center gap-2">
+            <div className="p-3.5 rounded-2xl bg-[#BCD94E]/10 border border-[#BCD94E]/20 text-[#BCD94E] text-xs font-semibold flex items-center gap-2">
               <CheckCircle size={16} />
               <span>{actionNotice}</span>
             </div>
@@ -321,7 +321,7 @@ export default function AdminPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="glass-card rounded-2xl p-4 border border-zinc-800 space-y-1">
               <span className="text-zinc-500 text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5">
-                <Users size={13} className="text-indigo-400" /> Total Registered Users
+                <Users size={13} className="text-[#BCD94E]" /> Total Registered Users
               </span>
               <p className="text-2xl font-extrabold text-zinc-100">{totalUsers}</p>
             </div>
@@ -359,7 +359,7 @@ export default function AdminPage() {
                   placeholder="Filter users by username or email..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#BCD94E]/40"
                 />
               </div>
 
@@ -404,7 +404,7 @@ export default function AdminPage() {
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-zinc-500">
                         <div className="flex items-center justify-center gap-2">
-                          <Loader2 size={16} className="animate-spin text-indigo-400" />
+                          <Loader2 size={16} className="animate-spin text-[#BCD94E]" />
                           <span>Loading real platform users...</span>
                         </div>
                       </td>
@@ -427,7 +427,7 @@ export default function AdminPage() {
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                               user.role === 'admin'
-                                ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'
+                                ? 'bg-[#BCD94E]/15 text-[#BCD94E] border border-[#BCD94E]/30'
                                 : 'bg-zinc-800 text-zinc-400'
                             }`}
                           >

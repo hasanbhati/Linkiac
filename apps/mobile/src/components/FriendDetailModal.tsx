@@ -9,9 +9,10 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { X, User, Send, Trash2, UserCheck, UserPlus, Clock } from 'lucide-react-native';
+import { X, User, Send, Trash2, UserCheck, UserPlus, Clock, ShieldAlert } from 'lucide-react-native';
 import { Friendship } from '@linkiac/shared';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface FriendDetailModalProps {
   visible: boolean;
@@ -27,6 +28,7 @@ export function FriendDetailModal({
   onOpenSendModal,
 }: FriendDetailModalProps) {
   const { currentUser, acceptFriendRequest, removeFriend } = useApp();
+  const { theme, isDark } = useTheme();
 
   if (!friendship) return null;
 
@@ -76,6 +78,29 @@ export function FriendDetailModal({
     ]);
   };
 
+  const handleBlock = () => {
+    Alert.alert(
+      `Block @${username}`,
+      `Are you sure you want to block @${username}? They will be removed from your friends and won't be able to send you links or requests.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block User',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeFriend(friendship.id);
+              Alert.alert('User Blocked', `@${username} has been blocked and removed.`);
+              onClose();
+            } catch {
+              Alert.alert('Error', 'Failed to block user.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -84,50 +109,50 @@ export function FriendDetailModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Friend Profile</Text>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Friend Profile</Text>
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <X color="#a1a1aa" size={20} />
+              <X color={theme.textMuted} size={20} />
             </TouchableOpacity>
           </View>
 
           {/* Profile Details */}
           <View style={styles.profileSection}>
-            <View style={styles.avatarLarge}>
+            <View style={[styles.avatarLarge, { backgroundColor: theme.accentPrimary }]}>
               {avatarUrl ? (
                 <Image source={{ uri: avatarUrl }} style={styles.avatarImgLarge} />
               ) : (
                 <User color="#ffffff" size={36} />
               )}
             </View>
-            <Text style={styles.displayName}>{displayName}</Text>
-            <Text style={styles.username}>@{username}</Text>
+            <Text style={[styles.displayName, { color: theme.textPrimary }]}>{displayName}</Text>
+            <Text style={[styles.username, { color: theme.accentPrimary }]}>@{username}</Text>
 
             <View style={styles.statusRow}>
               {isAccepted ? (
-                <View style={styles.badgeAccepted}>
-                  <UserCheck color="#34d399" size={14} />
-                  <Text style={styles.badgeTextAccepted}>Connected Friends</Text>
+                <View style={[styles.badgeAccepted, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                  <UserCheck color={isDark ? '#34d399' : '#15803d'} size={14} />
+                  <Text style={[styles.badgeTextAccepted, { color: isDark ? '#34d399' : '#15803d' }]}>Connected Friends</Text>
                 </View>
               ) : isIncoming ? (
-                <View style={styles.badgePending}>
-                  <Clock color="#a5b4fc" size={14} />
-                  <Text style={styles.badgeTextPending}>Friend Request Received</Text>
+                <View style={[styles.badgePending, { backgroundColor: theme.accentPrimaryMuted }]}>
+                  <Clock color={theme.accentPrimary} size={14} />
+                  <Text style={[styles.badgeTextPending, { color: theme.accentPrimary }]}>Friend Request Received</Text>
                 </View>
               ) : (
-                <View style={styles.badgePendingOutgoing}>
-                  <Clock color="#fbbf24" size={14} />
-                  <Text style={styles.badgeTextPendingOutgoing}>Request Sent (Pending)</Text>
+                <View style={[styles.badgePendingOutgoing, { backgroundColor: isDark ? '#451a03' : '#fef3c7' }]}>
+                  <Clock color={isDark ? '#fbbf24' : '#d97706'} size={14} />
+                  <Text style={[styles.badgeTextPendingOutgoing, { color: isDark ? '#fbbf24' : '#d97706' }]}>Request Sent (Pending)</Text>
                 </View>
               )}
             </View>
 
-            <Text style={styles.metaDate}>
+            <Text style={[styles.metaDate, { color: theme.textMuted }]}>
               {isAccepted
                 ? `Friends since ${new Date(friendship.created_at).toLocaleDateString()}`
                 : `Requested on ${new Date(friendship.created_at).toLocaleDateString()}`}
@@ -138,38 +163,48 @@ export function FriendDetailModal({
           <View style={styles.actionsSection}>
             {isAccepted && (
               <TouchableOpacity
-                style={styles.actionPrimary}
+                style={[styles.actionPrimary, { backgroundColor: theme.accentPrimary }]}
                 onPress={() => {
                   onClose();
                   onOpenSendModal(friendship);
                 }}
               >
-                <Send color="#ffffff" size={16} />
-                <Text style={styles.actionPrimaryText}>Send Link to @{username}</Text>
+                <Send color={theme.accentText} size={16} />
+                <Text style={[styles.actionPrimaryText, { color: theme.accentText }]}>Send Link to @{username}</Text>
               </TouchableOpacity>
             )}
 
             {isIncoming && (
               <TouchableOpacity
-                style={styles.actionPrimary}
+                style={[styles.actionPrimary, { backgroundColor: theme.accentPrimary }]}
                 onPress={handleAccept}
               >
-                <UserPlus color="#ffffff" size={16} />
-                <Text style={styles.actionPrimaryText}>Accept Friend Request</Text>
+                <UserPlus color={theme.accentText} size={16} />
+                <Text style={[styles.actionPrimaryText, { color: theme.accentText }]}>Accept Friend Request</Text>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity
-              style={styles.actionDanger}
+              style={[styles.actionDanger, { backgroundColor: theme.dangerBg, borderColor: theme.danger }]}
               onPress={handleRemove}
             >
-              <Trash2 color="#ef4444" size={16} />
-              <Text style={styles.actionDangerText}>
+              <Trash2 color={theme.danger} size={16} />
+              <Text style={[styles.actionDangerText, { color: theme.danger }]}>
                 {isAccepted
                   ? 'Remove Friend'
                   : isIncoming
                   ? 'Decline Request'
                   : 'Cancel Sent Request'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionDanger, { backgroundColor: theme.dangerBg, borderColor: theme.danger }]}
+              onPress={handleBlock}
+            >
+              <ShieldAlert color={theme.danger} size={16} />
+              <Text style={[styles.actionDangerText, { color: theme.danger }]}>
+                Block @{username}
               </Text>
             </TouchableOpacity>
           </View>
@@ -216,7 +251,6 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#4f46e5',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -233,7 +267,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   username: {
-    color: '#818cf8',
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 12,
@@ -259,13 +292,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#312e81',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
   badgeTextPending: {
-    color: '#a5b4fc',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -298,7 +329,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#4f46e5',
     height: 46,
     borderRadius: 10,
   },

@@ -8,7 +8,7 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { SendLinkModal } from '@/components/SendLinkModal';
 import { useApp } from '@/lib/app-context';
 import { getSupabase } from '@/lib/supabase/client';
-import { Users, UserPlus, UserCheck, Search, Send, UserX, Check, X, Shield, Loader2 } from 'lucide-react';
+import { Users, UserPlus, UserCheck, Search, Send, UserX, Check, X, Shield, ShieldAlert, Loader2 } from 'lucide-react';
 
 export default function FriendsPage() {
   const { currentUser, friends, acceptFriendRequest, removeFriend, syncAllFromSupabase } = useApp();
@@ -94,6 +94,13 @@ export default function FriendsPage() {
     }
   };
 
+  const handleBlockFriend = async (friendshipId: string, name: string) => {
+    if (confirm(`Block @${name}? They will be removed from your friends and won't be able to send you links or requests.`)) {
+      await removeFriend(friendshipId);
+      alert(`@${name} has been blocked.`);
+    }
+  };
+
   const handleSendRequest = async (targetUser: Profile) => {
     try {
       const supabase = getSupabase();
@@ -129,7 +136,7 @@ export default function FriendsPage() {
   };
 
   return (
-    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
+    <div className="h-screen bg-[#F9FAFB] text-[#111827] dark:bg-zinc-950 dark:text-zinc-100 flex flex-col overflow-hidden transition-colors duration-150">
       <Navbar />
 
       <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
@@ -143,51 +150,51 @@ export default function FriendsPage() {
 
         <main className="flex-1 p-4 sm:p-8 overflow-y-auto space-y-8">
           {/* Header */}
-          <div className="border-b border-zinc-800/80 pb-5">
+          <div className="border-b border-gray-200/80 dark:border-zinc-800/80 pb-5">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100 flex items-center gap-2.5">
-                <Users size={22} className="text-indigo-400" />
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-zinc-100 flex items-center gap-2.5">
+                <Users size={22} className="text-[#093329] dark:text-[#BCD94E]" />
                 <span>Friends & Social Recommendations</span>
               </h1>
             </div>
-            <p className="text-xs text-zinc-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">
               Connect with friends by username to privately send and receive link recommendations.
             </p>
           </div>
 
           {/* Find New Friends */}
-          <div className="glass-card rounded-2xl p-5 border border-zinc-800 space-y-4">
-            <h2 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-              <UserPlus size={16} className="text-indigo-400" />
+          <div className="glass-card rounded-2xl p-5 border border-gray-200 dark:border-zinc-800 space-y-4">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-zinc-200 flex items-center gap-2">
+              <UserPlus size={16} className="text-[#093329] dark:text-[#BCD94E]" />
               <span>Discover & Add Friends</span>
             </h2>
 
             <div className="relative">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500" />
               <input
                 type="text"
                 placeholder="Search by public username (e.g. alex_curator, elena_designer)..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#093329]/20 dark:focus:ring-[#BCD94E]/30 dark:focus:border-[#BCD94E] shadow-xs"
               />
             </div>
 
             {searchQuery.trim() && (
-              <div className="space-y-2 pt-2 border-t border-zinc-800/60">
+              <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-zinc-800/60">
                 {isSearching && (
-                  <div className="flex items-center gap-2 py-3 text-xs text-zinc-400 justify-center">
-                    <Loader2 size={14} className="animate-spin text-indigo-400" />
+                  <div className="flex items-center gap-2 py-3 text-xs text-gray-500 dark:text-zinc-400 justify-center">
+                    <Loader2 size={14} className="animate-spin text-[#093329] dark:text-[#BCD94E]" />
                     <span>Searching for Linkiac users...</span>
                   </div>
                 )}
 
                 {searchError && (
-                  <p className="text-xs text-red-400 py-1">{searchError}</p>
+                  <p className="text-xs text-red-500 dark:text-red-400 py-1">{searchError}</p>
                 )}
 
                 {!isSearching && searchResults.length === 0 && (
-                  <p className="text-xs text-zinc-500 py-2 text-center">
+                  <p className="text-xs text-gray-500 dark:text-zinc-500 py-2 text-center">
                     No users found matching &ldquo;@{searchQuery.trim()}&rdquo;.
                   </p>
                 )}
@@ -202,29 +209,29 @@ export default function FriendsPage() {
                     return (
                       <div
                         key={user.id}
-                        className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs"
+                        className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 text-xs shadow-xs"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full overflow-hidden bg-indigo-900/40 border border-zinc-700 flex items-center justify-center shrink-0">
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-emerald-100 dark:bg-[#093329]/40 border border-emerald-300 dark:border-[#BCD94E]/30 flex items-center justify-center shrink-0">
                             {user.avatar_url ? (
                               <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
                             ) : (
-                              <Users size={14} className="text-indigo-300" />
+                              <Users size={14} className="text-[#093329] dark:text-[#BCD94E]" />
                             )}
                           </div>
                           <div>
-                            <p className="font-semibold text-zinc-200">
+                            <p className="font-semibold text-gray-900 dark:text-zinc-200">
                               {user.display_name || `@${user.username}`}{' '}
-                              <span className="text-zinc-500 font-mono text-[11px]">@{user.username}</span>
+                              <span className="text-gray-500 dark:text-zinc-500 font-mono text-[11px]">@{user.username}</span>
                             </p>
-                            <p className="text-zinc-500 text-[10px]">
+                            <p className="text-gray-400 dark:text-zinc-500 text-[10px]">
                               Member since {new Date(user.created_at || Date.now()).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
 
                         {isConnected ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-2.5 py-1 rounded-lg">
                             <Check size={12} /> Friends
                           </span>
                         ) : isPendingIncoming ? (
@@ -236,14 +243,14 @@ export default function FriendsPage() {
                             <Check size={12} /> Accept Request
                           </button>
                         ) : isPendingOutgoing ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-2.5 py-1 rounded-lg">
                             Request Pending
                           </span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => handleSendRequest(user)}
-                            className="px-3 py-1.5 rounded-xl font-medium transition-all bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 active:scale-95"
+                            className="px-3 py-1.5 rounded-xl font-medium transition-all bg-[#093329] hover:bg-[#0d4739] dark:bg-[#BCD94E] dark:hover:bg-[#a8c43f] text-white dark:text-[#093329] dark:font-bold shadow-md shadow-[#093329]/15 dark:shadow-[#BCD94E]/15 active:scale-95"
                           >
                             Add Friend
                           </button>
@@ -258,9 +265,9 @@ export default function FriendsPage() {
           {/* Incoming / Pending Friend Requests */}
           {incomingRequests.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-amber-400 flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2">
                 <span>Pending Requests</span>
-                <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                <span className="bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 text-[10px] font-mono px-2 py-0.5 rounded-full">
                   {incomingRequests.length}
                 </span>
               </h2>
@@ -272,27 +279,37 @@ export default function FriendsPage() {
                   return (
                     <div
                       key={req.id}
-                      className="p-4 rounded-2xl bg-zinc-900 border border-amber-500/30 flex items-center justify-between gap-3 text-xs"
+                      className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-amber-300 dark:border-amber-500/30 flex items-center justify-between gap-3 text-xs shadow-xs"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center overflow-hidden">
+                        <div className="w-9 h-9 rounded-full bg-amber-50 dark:bg-zinc-800 border border-amber-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden">
                           {profile.avatar_url ? (
                             <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover" />
                           ) : (
-                            <Users size={16} className="text-zinc-400" />
+                            <Users size={16} className="text-amber-600 dark:text-zinc-400" />
                           )}
                         </div>
                         <div>
-                          <p className="font-semibold text-zinc-100">{profile.display_name || profile.username}</p>
-                          <p className="text-zinc-500 font-mono text-[11px]">@{profile.username}</p>
+                          <p className="font-semibold text-gray-900 dark:text-zinc-100">{profile.display_name || profile.username}</p>
+                          <p className="text-gray-500 dark:text-zinc-500 font-mono text-[11px]">@{profile.username}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          onClick={() => handleBlockFriend(req.id, profile.username)}
+                          aria-label="Block user"
+                          className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:text-zinc-400 dark:hover:text-red-400 dark:hover:bg-red-500/10 transition-colors"
+                          title={`Block @${profile.username}`}
+                        >
+                          <ShieldAlert size={16} />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDecline(req.id)}
-                          className="p-1.5 text-zinc-400 hover:text-red-400 rounded-lg hover:bg-zinc-800"
+                          aria-label="Decline request"
+                          className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 dark:text-zinc-400 dark:hover:text-red-400 dark:hover:bg-zinc-800 transition-colors"
                           title="Decline"
                         >
                           <X size={16} />
@@ -300,7 +317,7 @@ export default function FriendsPage() {
                         <button
                           type="button"
                           onClick={() => handleAccept(req.id)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-md shadow-indigo-600/20"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
                         >
                           <Check size={14} />
                           <span>Accept</span>
@@ -316,9 +333,9 @@ export default function FriendsPage() {
           {/* Outgoing Friend Requests Sent */}
           {outgoingRequests.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-zinc-400 flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-zinc-400 flex items-center gap-2">
                 <span>Sent Requests</span>
-                <span className="bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                <span className="bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 border border-gray-200 dark:border-zinc-700 text-[10px] font-mono px-2 py-0.5 rounded-full">
                   {outgoingRequests.length}
                 </span>
               </h2>
@@ -331,27 +348,27 @@ export default function FriendsPage() {
                   return (
                     <div
                       key={req.id}
-                      className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between gap-3 text-xs"
+                      className="p-4 rounded-2xl bg-white dark:bg-zinc-900/60 border border-gray-200 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs shadow-xs"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center overflow-hidden">
+                        <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden">
                           {profile?.avatar_url ? (
                             <img src={profile.avatar_url} alt={targetUsername} className="w-full h-full object-cover" />
                           ) : (
-                            <Users size={16} className="text-zinc-500" />
+                            <Users size={16} className="text-gray-400 dark:text-zinc-500" />
                           )}
                         </div>
                         <div>
-                          <p className="font-semibold text-zinc-200">{targetName}</p>
-                          <p className="text-zinc-500 font-mono text-[11px]">@{targetUsername}</p>
-                          <p className="text-[10px] text-zinc-500 mt-0.5">Awaiting their acceptance</p>
+                          <p className="font-semibold text-gray-900 dark:text-zinc-200">{targetName}</p>
+                          <p className="text-gray-500 dark:text-zinc-500 font-mono text-[11px]">@{targetUsername}</p>
+                          <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-0.5">Awaiting their acceptance</p>
                         </div>
                       </div>
 
                       <button
                         type="button"
                         onClick={() => handleCancelRequest(req.id)}
-                        className="px-2.5 py-1 text-[11px] rounded-lg border border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/10 transition-colors"
+                        className="px-2.5 py-1 text-[11px] rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-600 hover:text-red-500 hover:border-red-200 hover:bg-red-50 dark:text-zinc-400 dark:hover:text-red-400 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 transition-colors"
                       >
                         Cancel Request
                       </button>
@@ -365,10 +382,10 @@ export default function FriendsPage() {
           {/* Accepted Friends List */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-                <UserCheck size={16} className="text-emerald-400" />
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-zinc-200 flex items-center gap-2">
+                <UserCheck size={16} className="text-emerald-500" />
                 <span>My Friends</span>
-                <span className="bg-zinc-900 text-zinc-400 border border-zinc-800 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                <span className="bg-white dark:bg-zinc-900 text-gray-600 dark:text-zinc-400 border border-gray-200 dark:border-zinc-800 text-[10px] font-mono px-2 py-0.5 rounded-full shadow-xs">
                   {acceptedFriends.length}
                 </span>
               </h2>
@@ -376,7 +393,7 @@ export default function FriendsPage() {
               <button
                 type="button"
                 onClick={() => setSendingModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-600/25 text-xs font-semibold"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#093329]/10 border border-[#093329]/30 text-[#093329] hover:bg-[#093329]/20 dark:bg-[#BCD94E]/15 dark:border-[#BCD94E]/30 dark:text-[#BCD94E] dark:hover:bg-[#BCD94E]/25 text-xs font-semibold transition-colors"
               >
                 <Send size={13} />
                 <span>Broadcast Link</span>
@@ -384,7 +401,7 @@ export default function FriendsPage() {
             </div>
 
             {acceptedFriends.length === 0 ? (
-              <div className="p-8 text-center bg-zinc-900/30 rounded-2xl border border-zinc-800 text-xs text-zinc-500">
+              <div className="p-8 text-center bg-white/60 dark:bg-zinc-900/30 rounded-2xl border border-gray-200 dark:border-zinc-800 text-xs text-gray-500 dark:text-zinc-500">
                 You haven&apos;t added any friends yet. Search for usernames above to connect!
               </div>
             ) : (
@@ -395,31 +412,32 @@ export default function FriendsPage() {
                   return (
                     <div
                       key={f.id}
-                      className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-between gap-3 text-xs"
+                      className="p-4 rounded-2xl bg-white dark:bg-zinc-900/80 border border-gray-200 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs shadow-xs"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center overflow-hidden">
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-zinc-800 border border-emerald-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden">
                           {profile.avatar_url ? (
                             <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover" />
                           ) : (
-                            <Users size={16} className="text-zinc-400" />
+                            <Users size={16} className="text-[#093329] dark:text-zinc-400" />
                           )}
                         </div>
                         <div>
-                          <p className="font-semibold text-zinc-100">{profile.display_name || profile.username}</p>
-                          <p className="text-zinc-500 font-mono text-[11px]">@{profile.username}</p>
-                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 mt-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          <p className="font-semibold text-gray-900 dark:text-zinc-100">{profile.display_name || profile.username}</p>
+                          <p className="text-gray-500 dark:text-zinc-500 font-mono text-[11px]">@{profile.username}</p>
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                             Connected
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setSendingModalOpen(true)}
-                          className="p-2 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20"
+                          aria-label={`Send a link to ${profile.username}`}
+                          className="p-2 rounded-xl bg-[#093329]/10 hover:bg-[#093329]/20 text-[#093329] dark:bg-[#BCD94E]/10 dark:hover:bg-[#BCD94E]/20 dark:text-[#BCD94E] border border-[#093329]/20 dark:border-[#BCD94E]/20 transition-colors"
                           title="Send a link to this friend"
                         >
                           <Send size={14} />
@@ -427,10 +445,20 @@ export default function FriendsPage() {
                         <button
                           type="button"
                           onClick={() => handleRemoveFriend(f.id, profile.username)}
-                          className="p-2 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-zinc-800"
+                          aria-label={`Remove friend ${profile.username}`}
+                          className="p-2 rounded-xl text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:text-zinc-500 dark:hover:text-amber-400 dark:hover:bg-zinc-800 transition-colors"
                           title="Remove friend"
                         >
                           <UserX size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleBlockFriend(f.id, profile.username)}
+                          aria-label={`Block ${profile.username}`}
+                          className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:text-zinc-500 dark:hover:text-red-400 dark:hover:bg-red-500/10 transition-colors"
+                          title={`Block @${profile.username}`}
+                        >
+                          <ShieldAlert size={14} />
                         </button>
                       </div>
                     </div>

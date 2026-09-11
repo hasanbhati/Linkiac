@@ -80,17 +80,18 @@ export function Sidebar({
   const isLibraryPage = pathname.startsWith('/library');
 
   return (
-    <aside className="w-64 flex-shrink-0 hidden md:flex flex-col h-full border-r border-zinc-800/80 p-4 space-y-6 overflow-y-auto">
+    <aside className="w-64 flex-shrink-0 hidden md:flex flex-col h-full border-r border-gray-200/80 dark:border-zinc-800/80 p-4 space-y-6 overflow-y-auto bg-white/40 dark:bg-transparent">
       {/* Primary Workspaces */}
       <nav className="space-y-1">
         {navItems.map(item => (
           <Link
             key={item.name}
             href={item.href}
+            aria-current={item.isActive ? 'page' : undefined}
             className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
               item.isActive
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
+                ? 'bg-[#093329] dark:bg-[#BCD94E]/15 text-white dark:text-[#BCD94E] dark:border dark:border-[#BCD94E]/30 shadow-md shadow-[#093329]/15 dark:shadow-[#BCD94E]/10 font-semibold'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-[#093329] dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100'
             }`}
           >
             <span className="flex items-center gap-2.5">
@@ -100,7 +101,9 @@ export function Sidebar({
             {item.badge !== undefined && (
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  item.isActive ? 'bg-white text-indigo-700' : 'bg-indigo-600 text-white'
+                  item.isActive
+                    ? 'bg-[#BCD94E] text-[#093329] dark:bg-[#BCD94E] dark:text-[#093329]'
+                    : 'bg-[#093329] dark:bg-[#BCD94E]/20 text-white dark:text-[#BCD94E]'
                 }`}
               >
                 {item.badge}
@@ -112,7 +115,7 @@ export function Sidebar({
 
       {/* Library Tree Filter Hierarchy */}
       {isLibraryPage && (
-        <div className="pt-2 border-t border-zinc-800/80">
+        <div className="pt-2 border-t border-gray-200/80 dark:border-zinc-800/80">
           <FolderTree
             selectedFolderId={selectedFolderId}
             isUnfiledOnly={isUnfiledOnly}
