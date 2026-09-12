@@ -424,7 +424,7 @@ export default function SettingsPage() {
                 <span>Appearance & Theme</span>
               </h2>
               <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">
-                Switch between Linkiac's bright branding light mode, classic dark mode, or follow your system theme.
+                Switch between Linkiac&apos;s bright branding light mode, classic dark mode, or follow your system theme.
               </p>
             </div>
 
