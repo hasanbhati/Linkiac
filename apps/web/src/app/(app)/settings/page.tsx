@@ -450,8 +450,7 @@ export default function SettingsPage() {
                   )}
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-gray-900 dark:text-zinc-100">Light Branding</div>
-                  <div className="text-[11px] text-gray-500 dark:text-zinc-400 mt-0.5">Vibrant palette with #F9FAFB canvas and #093329 pine</div>
+                  <div className="text-xs font-bold text-gray-900 dark:text-zinc-100">Light Interface</div>
                 </div>
               </button>
 
@@ -477,7 +476,6 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <div className="text-xs font-bold text-gray-900 dark:text-zinc-100">Dark Interface</div>
-                  <div className="text-[11px] text-gray-500 dark:text-zinc-400 mt-0.5">Classic deep zinc palette for comfortable night reading</div>
                 </div>
               </button>
 
@@ -503,7 +501,6 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <div className="text-xs font-bold text-gray-900 dark:text-zinc-100">System Sync</div>
-                  <div className="text-[11px] text-gray-500 dark:text-zinc-400 mt-0.5">Automatically follows your device OS appearance</div>
                 </div>
               </button>
             </div>

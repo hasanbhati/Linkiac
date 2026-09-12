@@ -17,6 +17,7 @@ import {
   Laptop,
 } from 'lucide-react';
 import { LinkiacLogo } from '@/components/LinkiacLogo';
+import { ScrollToTopButton } from '@/components/ScrollToTopButton';
 
 export default function HomePage() {
   return (
@@ -380,15 +381,6 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-gray-500 font-medium">
-            <Link href="/login" className="hover:text-[#093329] transition-colors">
-              Log In
-            </Link>
-            <Link href="/signup" className="hover:text-[#093329] transition-colors">
-              Sign Up
-            </Link>
-            <a href="#features" className="hover:text-[#093329] transition-colors">
-              Features
-            </a>
             <Link href="/privacy" className="hover:text-[#093329] transition-colors">
               Privacy Policy
             </Link>
@@ -402,6 +394,8 @@ export default function HomePage() {
             <span>linkiac.eu</span>
             <span className="text-gray-300">•</span>
             <span>v1.0.0</span>
+            <span className="text-gray-300">•</span>
+            <ScrollToTopButton />
           </div>
 
           <p className="text-xs text-gray-400 font-normal">

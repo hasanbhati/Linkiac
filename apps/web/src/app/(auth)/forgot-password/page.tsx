@@ -37,7 +37,19 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] dark:bg-zinc-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 transition-colors duration-150">
+    <div className="min-h-screen bg-[#F9FAFB] dark:bg-zinc-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 transition-colors duration-150 relative">
+      {/* Redirection Button to Homepage */}
+      <div className="absolute top-4 left-4 sm:top-8 sm:left-8">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-100 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800/80 border border-gray-200 dark:border-zinc-800 shadow-xs transition-all active:scale-95 group"
+          aria-label="Back to Homepage"
+        >
+          <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+          <span>Back to Home</span>
+        </Link>
+      </div>
+
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3">
         <Link href="/" className="inline-flex items-center justify-center p-2 rounded-2xl hover:scale-105 transition-transform" aria-label="Linkiac Home">
           <LinkiacSymbol size={52} />
