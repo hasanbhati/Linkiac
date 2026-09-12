@@ -170,14 +170,17 @@ export default function MobileSettingsScreen() {
 
     setIsSavingEmail(true);
     try {
-      const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+      const { error } = await supabase.auth.updateUser(
+        { email: newEmail.trim() },
+        { emailRedirectTo: 'https://linkiac.eu/auth/callback' }
+      );
       if (error) throw error;
 
       setIsChangeEmailOpen(false);
       setNewEmail('');
       Alert.alert(
         'Confirmation Sent',
-        `A confirmation email has been sent to ${newEmail.trim()}. Please click the link in your inbox to confirm your new email address.`
+        `A confirmation link has been sent to ${newEmail.trim()}. Please click the link in your inbox to confirm your new email address.`
       );
     } catch (err: any) {
       Alert.alert('Email Update Failed', err.message || 'Failed to update email.');

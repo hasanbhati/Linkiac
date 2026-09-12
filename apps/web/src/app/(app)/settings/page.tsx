@@ -192,12 +192,16 @@ export default function SettingsPage() {
 
     try {
       const supabase = getSupabase();
-      const { error } = await supabase.auth.updateUser({ email: email.trim() });
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const { error } = await supabase.auth.updateUser(
+        { email: email.trim() },
+        { emailRedirectTo: `${origin}/auth/callback` }
+      );
       if (error) {
         setEmailError(error.message);
       } else {
         setEmailSaved(true);
-        setTimeout(() => setEmailSaved(false), 5000);
+        setTimeout(() => setEmailSaved(false), 6000);
       }
     } catch (err: any) {
       setEmailError(err.message || 'Failed to update email');
