@@ -1,0 +1,14 @@
+# Nixpacks configuration for Linkiac Monorepo on Railway
+# Docs: https://nixpacks.com/docs/configuration/file
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "pnpm"]
+
+[phases.install]
+cmds = ["pnpm i --frozen-lockfile"]
+
+[phases.build]
+cmds = ["pnpm --filter @linkiac/web build"]
+
+[start]
+cmd = "pnpm --filter @linkiac/web start"

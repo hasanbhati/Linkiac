@@ -2,7 +2,6 @@
   "name": "linkiac-monorepo",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "turbo run dev --parallel",
     "dev:web": "turbo run dev --filter=@linkiac/web",
