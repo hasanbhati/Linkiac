@@ -165,6 +165,7 @@ export default function MobileLoginScreen() {
               username: cleanUsername,
               full_name: cleanUsername,
             },
+            emailRedirectTo: 'https://linkiac.eu/auth/callback',
           },
         });
 
