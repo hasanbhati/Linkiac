@@ -86,7 +86,24 @@ export async function GET(request: Request) {
     if (!exchangeError) {
       return NextResponse.redirect(`${publicOrigin}${next}`);
     }
+
     console.error('Failed to exchange code for session:', exchangeError.message);
+
+    // Cross-device / cross-browser flow:
+    // If the confirmation link was clicked in a different browser/device than where signup started,
+    // Supabase has already verified the email at auth/v1/verify, but PKCE code verifier cookie is missing.
+    // The email IS confirmed, so prompt the user to log in with credentials rather than showing an error.
+    if (
+      exchangeError.message.toLowerCase().includes('code verifier') ||
+      exchangeError.message.toLowerCase().includes('pkce')
+    ) {
+      return NextResponse.redirect(
+        `${publicOrigin}/login?notice=${encodeURIComponent(
+          'Your email has been confirmed! Please sign in with your credentials to continue.'
+        )}&redirectTo=${encodeURIComponent(next)}`
+      );
+    }
+
     return NextResponse.redirect(
       `${publicOrigin}/login?error=auth_code_error&description=${encodeURIComponent(exchangeError.message)}`
     );
