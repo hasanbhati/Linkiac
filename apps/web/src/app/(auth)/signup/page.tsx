@@ -29,10 +29,12 @@ function SignupForm() {
     try {
       const supabase = getSupabase();
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const canonicalOrigin = process.env.NEXT_PUBLIC_SITE_URL || origin;
+      const targetOrigin = origin.includes('localhost') ? origin : canonicalOrigin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+          redirectTo: `${targetOrigin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
         },
       });
 
@@ -53,10 +55,12 @@ function SignupForm() {
     try {
       const supabase = getSupabase();
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const canonicalOrigin = process.env.NEXT_PUBLIC_SITE_URL || origin;
+      const targetOrigin = origin.includes('localhost') ? origin : canonicalOrigin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
         options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+          redirectTo: `${targetOrigin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
         },
       });
 
@@ -109,6 +113,8 @@ function SignupForm() {
       }
 
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const canonicalOrigin = process.env.NEXT_PUBLIC_SITE_URL || origin;
+      const targetOrigin = origin.includes('localhost') ? origin : canonicalOrigin;
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -117,7 +123,7 @@ function SignupForm() {
             username: cleanUsername,
             full_name: cleanUsername,
           },
-          emailRedirectTo: `${origin}/auth/callback`,
+          emailRedirectTo: `${targetOrigin}/auth/callback`,
         },
       });
 

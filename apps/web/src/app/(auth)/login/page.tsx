@@ -3,7 +3,7 @@
 import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, ArrowLeft, Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Lock, Mail, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase/client';
 import { LinkiacSymbol } from '@/components/LinkiacLogo';
 
@@ -12,15 +12,28 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/library';
   const errorParam = searchParams.get('error');
+  const descriptionParam = searchParams.get('description') || searchParams.get('error_description');
+  const noticeParam = searchParams.get('notice');
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(
-    errorParam === 'auth_callback_failed' ? 'Authentication failed. Please try again.' : null
-  );
+
+  const [noticeMsg] = useState<string | null>(() => {
+    if (noticeParam) return noticeParam;
+    return null;
+  });
+
+  const [errorMsg, setErrorMsg] = useState<string | null>(() => {
+    if (descriptionParam) return descriptionParam;
+    if (errorParam === 'auth_callback_failed') return 'Authentication failed. Please try again.';
+    if (errorParam === 'expired_or_used') {
+      return 'This confirmation link has expired or has already been used. If your account is already confirmed, please sign in below.';
+    }
+    return errorParam || null;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,10 +100,12 @@ function LoginForm() {
     try {
       const supabase = getSupabase();
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const canonicalOrigin = process.env.NEXT_PUBLIC_SITE_URL || origin;
+      const targetOrigin = origin.includes('localhost') ? origin : canonicalOrigin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+          redirectTo: `${targetOrigin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
         },
       });
 
@@ -111,10 +126,12 @@ function LoginForm() {
     try {
       const supabase = getSupabase();
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const canonicalOrigin = process.env.NEXT_PUBLIC_SITE_URL || origin;
+      const targetOrigin = origin.includes('localhost') ? origin : canonicalOrigin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
         options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+          redirectTo: `${targetOrigin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
         },
       });
 
@@ -152,6 +169,13 @@ function LoginForm() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
         <div className="glass-card py-8 px-6 sm:px-10 rounded-3xl border border-gray-200 dark:border-zinc-800 space-y-6 shadow-sm">
+          {noticeMsg && !errorMsg && (
+            <div className="p-3 bg-[#093329]/10 dark:bg-[#BCD94E]/10 border border-[#093329]/20 dark:border-[#BCD94E]/30 rounded-xl flex items-center gap-2 text-xs text-[#093329] dark:text-[#BCD94E] font-medium animate-fade-in" role="status">
+              <CheckCircle2 size={16} className="shrink-0 text-[#093329] dark:text-[#BCD94E]" />
+              <span>{noticeMsg}</span>
+            </div>
+          )}
+
           {errorMsg && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2 text-xs text-red-500 dark:text-red-400 animate-fade-in" role="alert">
               <AlertCircle size={16} className="shrink-0" />
