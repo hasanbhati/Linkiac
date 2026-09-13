@@ -92,7 +92,9 @@ export default function MobileLoginScreen() {
     }
     setIsSendingReset(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim());
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+        redirectTo: 'https://linkiac.eu/auth/callback?next=/reset-password',
+      });
       if (error) throw error;
       Alert.alert(
         'Reset Link Sent',
