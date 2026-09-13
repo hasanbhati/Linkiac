@@ -83,7 +83,10 @@ function LoginForm() {
       }
 
       if (data.session) {
-        router.push(redirectTo);
+        const dest = noticeParam
+          ? (redirectTo.includes('?') ? `${redirectTo}&activated=true` : `${redirectTo}?activated=true`)
+          : redirectTo;
+        router.push(dest);
         router.refresh();
       }
     } catch (err: any) {

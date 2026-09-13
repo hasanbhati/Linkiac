@@ -72,7 +72,8 @@ export async function GET(request: Request) {
       token_hash,
     });
     if (!verifyError) {
-      return NextResponse.redirect(`${publicOrigin}${next}`);
+      const destination = next.includes('?') ? `${next}&activated=true` : `${next}?activated=true`;
+      return NextResponse.redirect(`${publicOrigin}${destination}`);
     }
     console.error('Failed to verify OTP token_hash:', verifyError.message);
     return NextResponse.redirect(
@@ -84,7 +85,8 @@ export async function GET(request: Request) {
   if (code) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
     if (!exchangeError) {
-      return NextResponse.redirect(`${publicOrigin}${next}`);
+      const destination = next.includes('?') ? `${next}&activated=true` : `${next}?activated=true`;
+      return NextResponse.redirect(`${publicOrigin}${destination}`);
     }
 
     console.error('Failed to exchange code for session:', exchangeError.message);
@@ -115,7 +117,8 @@ export async function GET(request: Request) {
       data: { session },
     } = await supabase.auth.getSession();
     if (session) {
-      return NextResponse.redirect(`${publicOrigin}${next}`);
+      const destination = next.includes('?') ? `${next}&activated=true` : `${next}?activated=true`;
+      return NextResponse.redirect(`${publicOrigin}${destination}`);
     }
   } catch {}
 

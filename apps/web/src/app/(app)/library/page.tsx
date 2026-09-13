@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Search,
   BookOpen,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function LibraryPage() {
@@ -47,6 +48,18 @@ export default function LibraryPage() {
   const [sendingLink, setSendingLink] = useState<LinkType | null>(null);
   const [movingLink, setMovingLink] = useState<LinkType | null>(null);
   const [toastNotice, setToastNotice] = useState<string | null>(null);
+  const [showActivatedBanner, setShowActivatedBanner] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get('activated') === 'true' || searchParams.get('verified') === 'true') {
+        setShowActivatedBanner(true);
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+      }
+    }
+  }, []);
 
   // Folder creation modal state (for mobile & desktop)
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
@@ -204,6 +217,41 @@ export default function LibraryPage() {
 
         {/* Main Content Area */}
         <main className="flex-1 p-4 sm:p-8 pb-28 md:pb-8 overflow-y-auto space-y-4 md:space-y-6">
+          {/* Account Activated Success Banner */}
+          {showActivatedBanner && (
+            <div
+              role="status"
+              className="relative overflow-hidden rounded-2xl bg-[#093329] dark:bg-[#152414] border border-[#BCD94E]/40 text-white p-4 sm:p-4.5 shadow-lg shadow-[#093329]/10 dark:shadow-[#BCD94E]/5 animate-fade-in flex items-start justify-between gap-3"
+            >
+              <div className="flex items-start gap-3 sm:gap-3.5">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#BCD94E] text-[#093329] flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                  <CheckCircle2 size={18} className="stroke-[2.5]" />
+                </div>
+                <div className="space-y-0.5 sm:space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs sm:text-sm font-bold text-white dark:text-[#BCD94E]">
+                      Your account was activated successfully!
+                    </h2>
+                    <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#BCD94E]/20 text-[#BCD94E] border border-[#BCD94E]/30 hidden sm:inline-block">
+                      Verified
+                    </span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-emerald-100/80 dark:text-zinc-300 leading-relaxed max-w-xl">
+                    Welcome to Linkiac! Your email has been confirmed and your library is ready. Start saving and organizing your links.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowActivatedBanner(false)}
+                className="p-1.5 rounded-lg text-emerald-200/70 hover:text-white dark:text-zinc-400 dark:hover:text-white hover:bg-white/10 dark:hover:bg-white/5 transition-colors shrink-0"
+                aria-label="Close message"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
           {/* ========================================================= */}
           {/* MOBILE VIEW CONTROLS (md:hidden - Matches Mobile App UI/UX) */}
           {/* ========================================================= */}
