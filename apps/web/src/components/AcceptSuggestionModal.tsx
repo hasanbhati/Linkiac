@@ -42,7 +42,7 @@ export function AcceptSuggestionModal({ isOpen, onClose, suggestion }: AcceptSug
 
   const handleConfirm = (e: React.FormEvent) => {
     e.preventDefault();
-    acceptSuggestion(suggestion.id, null, folderId, comment.trim() || null, title.trim() || null);
+    acceptSuggestion(suggestion.id, folderId, comment.trim() || null, title.trim() || null);
     onClose();
   };
 

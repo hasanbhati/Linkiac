@@ -4,7 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import {
   Profile,
-  Category,
   Folder,
   Link,
   Friendship,
@@ -38,7 +37,6 @@ export interface AddLinkInput {
   title?: string | null;
   comment?: string | null;
   reading_status?: ReadingStatus;
-  category_id?: string | null;
   folder_id?: string | null;
   thumbnail_url?: string | null;
 }
@@ -46,7 +44,6 @@ export interface AddLinkInput {
 interface AppContextType {
   currentUser: Profile;
   links: Link[];
-  categories: Category[];
   folders: Folder[];
   friends: Friendship[];
   suggestions: SendRecipient[];
@@ -56,15 +53,12 @@ interface AppContextType {
   addLink: (input: AddLinkInput) => Promise<Link>;
   updateLink: (id: string, updates: Partial<Link>) => Promise<void>;
   deleteLink: (id: string) => Promise<void>;
-  addCategory: (name: string) => Promise<Category>;
-  deleteCategory: (id: string) => Promise<void>;
-  addFolder: (name: string, category_id?: string | null, parent_folder_id?: string | null) => Promise<Folder>;
+  addFolder: (name: string, parent_folder_id?: string | null) => Promise<Folder>;
   deleteFolder: (id: string) => Promise<void>;
   updateProfile: (updates: { username?: string; display_name?: string; avatar_url?: string | null }) => Promise<void>;
   acceptSuggestion: (
     suggestionId: string,
     options?: {
-      category_id?: string | null;
       folder_id?: string | null;
       title?: string | null;
       comment?: string | null;
@@ -89,7 +83,7 @@ interface AppContextType {
     source_link_id?: string | null;
     thumbnail_url?: string | null;
   }) => Promise<void>;
-  bulkMoveLinks: (linkIds: string[], categoryId: string | null, folderId: string | null) => Promise<void>;
+  bulkMoveLinks: (linkIds: string[], folderId: string | null) => Promise<void>;
   bulkDeleteLinks: (linkIds: string[]) => Promise<void>;
   importBookmarks: (items: ParsedBookmark[]) => Promise<{ importedCount: number; foldersCount: number }>;
   syncAllFromSupabase: () => Promise<void>;
@@ -118,7 +112,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   routerRef.current = router;
   const [currentUser, setCurrentUser] = useState<Profile>(defaultCurrentUser);
   const [links, setLinks] = useState<Link[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [suggestions, setSuggestions] = useState<SendRecipient[]>([]);
@@ -139,7 +132,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } catch {}
       setCurrentUser(defaultCurrentUser);
       setLinks([]);
-      setCategories([]);
       setFolders([]);
       setFriends([]);
       setSuggestions([]);
@@ -187,17 +179,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }));
       }
 
-      const [linksRes, catsRes, foldersRes, friendsRes, suggestionsRes] = await Promise.allSettled([
+      const [linksRes, foldersRes, friendsRes, suggestionsRes] = await Promise.allSettled([
         supabase
           .from('links')
           .select('*')
           .eq('user_id', authUser.id)
           .order('created_at', { ascending: false }),
-        supabase
-          .from('categories')
-          .select('*')
-          .eq('user_id', authUser.id)
-          .order('name', { ascending: true }),
         supabase
           .from('folders')
           .select('*')
@@ -239,17 +226,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             reading_status: l.reading_status || 'to_read',
             thumbnail_url: l.thumbnail_url || null,
             thumbnail_source: l.thumbnail_source || (l.thumbnail_url ? 'auto' : 'none'),
-            category_id: l.category_id || null,
             folder_id: l.folder_id || null,
             created_at: l.created_at,
             updated_at: l.updated_at || l.created_at,
           };
         });
         setLinks(transformed);
-      }
-
-      if (catsRes.status === 'fulfilled' && !catsRes.value.error && Array.isArray(catsRes.value.data)) {
-        setCategories(catsRes.value.data);
       }
 
       if (foldersRes.status === 'fulfilled' && !foldersRes.value.error && Array.isArray(foldersRes.value.data)) {
@@ -333,7 +315,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             const parsed = JSON.parse(stored);
             if (parsed.userId === session.user.id) {
               if (Array.isArray(parsed.links)) setLinks(parsed.links);
-              if (Array.isArray(parsed.categories)) setCategories(parsed.categories);
               if (Array.isArray(parsed.folders)) setFolders(parsed.folders);
               if (Array.isArray(parsed.friends)) setFriends(parsed.friends);
               if (Array.isArray(parsed.suggestions)) {
@@ -351,7 +332,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(defaultCurrentUser);
         setLinks([]);
-        setCategories([]);
         setFolders([]);
         setFriends([]);
         setSuggestions([]);
@@ -410,7 +390,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         JSON.stringify({
           userId: currentUser.id,
           links,
-          categories,
           folders,
           friends,
           suggestions,
@@ -419,7 +398,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn('Linkiac mobile cache write notice:', err);
     }
-  }, [links, categories, folders, friends, suggestions, isLoaded, currentUser.id]);
+  }, [links, folders, friends, suggestions, isLoaded, currentUser.id]);
 
   // Domain statistics derived dynamically from saved links
   const domainStats = useMemo(() => {
@@ -456,7 +435,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reading_status: input.reading_status || 'to_read',
       thumbnail_url: resolvedThumbnail,
       thumbnail_source: resolvedThumbnail ? 'auto' : 'none',
-      category_id: input.category_id || null,
       folder_id: input.folder_id || null,
       created_at: now,
       updated_at: now,
@@ -481,7 +459,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           reading_status: newLink.reading_status,
           thumbnail_url: newLink.thumbnail_url,
           thumbnail_source: newLink.thumbnail_source,
-          category_id: newLink.category_id && isValidUUID(newLink.category_id) ? newLink.category_id : null,
           folder_id: newLink.folder_id && isValidUUID(newLink.folder_id) ? newLink.folder_id : null,
           domain: newLink.domain,
         });
@@ -515,7 +492,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         if (effectiveUserId) {
           const dbUpdates: any = { ...updates, updated_at: new Date().toISOString() };
-          if (dbUpdates.category_id && !isValidUUID(dbUpdates.category_id)) dbUpdates.category_id = null;
           if (dbUpdates.folder_id && !isValidUUID(dbUpdates.folder_id)) dbUpdates.folder_id = null;
           await supabase.from('links').update(dbUpdates).eq('id', id);
         }
@@ -543,14 +519,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const bulkMoveLinks = useCallback(async (
     linkIds: string[],
-    categoryId: string | null,
     folderId: string | null
   ): Promise<void> => {
     const idSet = new Set(linkIds);
     const now = new Date().toISOString();
     setLinks(prev =>
       prev.map(l =>
-        idSet.has(l.id) ? { ...l, category_id: categoryId, folder_id: folderId, updated_at: now } : l
+        idSet.has(l.id) ? { ...l, folder_id: folderId, updated_at: now } : l
       )
     );
 
@@ -560,7 +535,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await supabase
           .from('links')
           .update({
-            category_id: categoryId && isValidUUID(categoryId) ? categoryId : null,
             folder_id: folderId && isValidUUID(folderId) ? folderId : null,
             updated_at: now,
           })
@@ -608,7 +582,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const newFolder: Folder = {
             id: newFId,
             user_id: currentUser.id,
-            category_id: null,
             parent_folder_id: parentId,
             name: folderName,
             created_at: now,
@@ -636,7 +609,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         reading_status: 'to_read',
         thumbnail_url: null,
         thumbnail_source: 'none',
-        category_id: null,
         folder_id: folderId,
         created_at: now,
         updated_at: now,
@@ -654,7 +626,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             user_id: currentUser.id,
             name: f.name,
             parent_folder_id: f.parent_folder_id && isValidUUID(f.parent_folder_id) ? f.parent_folder_id : null,
-            category_id: null,
             created_at: f.created_at,
           });
         }
@@ -667,7 +638,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           domain: l.domain,
           reading_status: 'to_read',
           folder_id: l.folder_id && isValidUUID(l.folder_id) ? l.folder_id : null,
-          category_id: null,
           created_at: l.created_at,
           updated_at: l.updated_at,
         }));
@@ -685,65 +655,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { importedCount: newLinks.length, foldersCount: foldersCreated };
   }, [currentUser.id, syncAllFromSupabase]);
 
-  const addCategory = useCallback(async (name: string): Promise<Category> => {
-    const catId = generateUUID();
-    const newCategory: Category = {
-      id: catId,
-      user_id: currentUser.id,
-      name: name.trim(),
-      created_at: new Date().toISOString(),
-    };
-
-    setCategories(prev => [...prev, newCategory]);
-
-    try {
-      await supabase.from('categories').insert({
-        id: catId,
-        user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-        name: name.trim(),
-      });
-    } catch (e) {
-      console.warn('Supabase addCategory notice:', e);
-    }
-
-    syncAllFromSupabase();
-    return newCategory;
-  }, [currentUser.id, syncAllFromSupabase]);
-
-  const deleteCategory = useCallback(async (id: string): Promise<void> => {
-    setCategories(prev => prev.filter(c => c.id !== id));
-    setFolders(fPrev => fPrev.map(f => (f.category_id === id ? { ...f, category_id: null } : f)));
-    setLinks(lPrev => lPrev.map(l => (l.category_id === id ? { ...l, category_id: null } : l)));
-
-    if (isValidUUID(id)) {
-      try {
-        await supabase.from('links').update({ category_id: null }).eq('category_id', id);
-        await supabase.from('folders').update({ category_id: null }).eq('category_id', id);
-        await supabase.from('categories').delete().eq('id', id);
-      } catch (e) {
-        console.warn('Supabase deleteCategory notice:', e);
-      }
-    }
-
-    syncAllFromSupabase();
-  }, [syncAllFromSupabase]);
-
   const addFolder = useCallback(async (
     name: string,
-    category_id?: string | null,
     parent_folder_id?: string | null
   ): Promise<Folder> => {
-    let resolvedCategoryId = category_id || null;
-    if (parent_folder_id) {
-      const parent = folders.find(f => f.id === parent_folder_id);
-      if (parent) resolvedCategoryId = parent.category_id;
-    }
-
     const folderId = generateUUID();
     const newFolder: Folder = {
       id: folderId,
       user_id: currentUser.id,
-      category_id: resolvedCategoryId,
       parent_folder_id: parent_folder_id || null,
       name: name.trim(),
       created_at: new Date().toISOString(),
@@ -755,7 +674,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await supabase.from('folders').insert({
         id: folderId,
         user_id: isValidUUID(currentUser.id) ? currentUser.id : null,
-        category_id: resolvedCategoryId && isValidUUID(resolvedCategoryId) ? resolvedCategoryId : null,
         parent_folder_id: parent_folder_id && isValidUUID(parent_folder_id) ? parent_folder_id : null,
         name: name.trim(),
       });
@@ -765,7 +683,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     syncAllFromSupabase();
     return newFolder;
-  }, [currentUser.id, folders, syncAllFromSupabase]);
+  }, [currentUser.id, syncAllFromSupabase]);
 
   const deleteFolder = useCallback(async (id: string): Promise<void> => {
     const getDescendantIds = (folderId: string): string[] => {
@@ -843,7 +761,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const acceptSuggestion = useCallback(async (
     suggestionId: string,
     options?: {
-      category_id?: string | null;
       folder_id?: string | null;
       title?: string | null;
       comment?: string | null;
@@ -879,7 +796,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reading_status: 'to_read',
       thumbnail_url: item.send?.thumbnail_url || null,
       thumbnail_source: item.send?.thumbnail_url ? 'auto' : 'none',
-      category_id: options?.category_id || null,
       folder_id: options?.folder_id || null,
       created_at: now,
       updated_at: now,
@@ -901,7 +817,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           reading_status: 'to_read',
           thumbnail_url: createdLink.thumbnail_url,
           thumbnail_source: createdLink.thumbnail_source,
-          category_id: options?.category_id && isValidUUID(options.category_id) ? options.category_id : null,
           folder_id: options?.folder_id && isValidUUID(options.folder_id) ? options.folder_id : null,
         });
 
@@ -918,7 +833,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           console.warn('Direct link insert notice, attempting RPC fallback:', insertErr);
           const { data: rpcLinkId, error: rpcErr } = await supabase.rpc('accept_friend_suggestion', {
             p_suggestion_id: suggestionId,
-            p_category_id: options?.category_id && isValidUUID(options.category_id) ? options.category_id : null,
             p_folder_id: options?.folder_id && isValidUUID(options.folder_id) ? options.folder_id : null,
             p_custom_comment: effectiveComment,
           });
@@ -1157,7 +1071,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     () => ({
       currentUser,
       links,
-      categories,
       folders,
       friends,
       suggestions,
@@ -1167,8 +1080,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addLink,
       updateLink,
       deleteLink,
-      addCategory,
-      deleteCategory,
       addFolder,
       deleteFolder,
       updateProfile,
@@ -1186,7 +1097,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [
       currentUser,
       links,
-      categories,
       folders,
       friends,
       suggestions,
@@ -1196,8 +1106,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addLink,
       updateLink,
       deleteLink,
-      addCategory,
-      deleteCategory,
       addFolder,
       deleteFolder,
       updateProfile,

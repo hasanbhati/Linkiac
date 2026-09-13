@@ -8,7 +8,7 @@ import { useApp } from '@/lib/app-context';
 import { BarChart3, Globe, Bookmark, BookOpen, CheckCircle2, Clock, Folder, Layers } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { links, categories, folders, domainStats } = useApp();
+  const { links, folders, domainStats } = useApp();
 
   const toReadCount = links.filter(l => l.reading_status === 'to_read').length;
   const readingCount = links.filter(l => l.reading_status === 'reading').length;

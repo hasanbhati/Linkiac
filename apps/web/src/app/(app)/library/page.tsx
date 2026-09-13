@@ -12,23 +12,26 @@ import { MoveLinkModal } from '@/components/MoveLinkModal';
 import { BulkActionBar } from '@/components/BulkActionBar';
 import { useApp } from '@/lib/app-context';
 import {
-  Layers,
-  Filter,
   CheckSquare,
   Square,
   Plus,
   Inbox,
   Folder as FolderIcon,
+  FolderPlus,
   X,
   ArrowLeft,
+  ChevronRight,
+  Search,
+  BookOpen,
 } from 'lucide-react';
 
 export default function LibraryPage() {
-  const { links, folders, bulkMoveLinks } = useApp();
+  const { links, folders, addFolder, bulkMoveLinks } = useApp();
 
   // Navigation / Tree filter state
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [isUnfiledOnly, setIsUnfiledOnly] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'all' | 'unfiled' | 'folders'>('all');
 
   // Secondary filters
   const [statusFilter, setStatusFilter] = useState<ReadingStatus | 'all'>('all');
@@ -45,6 +48,16 @@ export default function LibraryPage() {
   const [movingLink, setMovingLink] = useState<LinkType | null>(null);
   const [toastNotice, setToastNotice] = useState<string | null>(null);
 
+  // Folder creation modal state (for mobile & desktop)
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
+
+  // Root folders (top level without parent)
+  const rootFolders = useMemo(() => {
+    return folders.filter(f => f.parent_folder_id === null);
+  }, [folders]);
+
   // Folder context
   const currentFolder = useMemo(() => {
     return selectedFolderId ? folders.find(f => f.id === selectedFolderId) : null;
@@ -58,7 +71,7 @@ export default function LibraryPage() {
     return currentFolder?.parent_folder_id ? folders.find(f => f.id === currentFolder.parent_folder_id) : null;
   }, [folders, currentFolder]);
 
-  // Active view header title
+  // Active view header title (for desktop)
   const activeViewTitle = useMemo(() => {
     if (currentFolder) return `Folder: ${currentFolder.name}`;
     if (isUnfiledOnly) return 'Unfiled Links';
@@ -72,6 +85,11 @@ export default function LibraryPage() {
     return folders.filter(f => f.name.toLowerCase().includes(q));
   }, [folders, searchQuery]);
 
+  // Unfiled count
+  const unfiledCount = useMemo(() => {
+    return links.filter(l => !l.folder_id).length;
+  }, [links]);
+
   // Filter links
   const filteredLinks = useMemo(() => {
     return links.filter(link => {
@@ -82,7 +100,7 @@ export default function LibraryPage() {
         if (link.folder_id) return false;
       }
 
-      // Reading status filter
+      // Reading status filter (only active if not 'all')
       if (statusFilter !== 'all' && link.reading_status !== statusFilter) {
         return false;
       }
@@ -130,11 +148,11 @@ export default function LibraryPage() {
 
     let targetLabel = 'Unfiled';
     if (target.type === 'unfiled' || target.type === 'all') {
-      bulkMoveLinks(idsToMove, null, null);
+      bulkMoveLinks(idsToMove, null);
       targetLabel = target.type === 'all' ? 'All Links (Unfiled)' : 'Unfiled';
     } else if (target.type === 'folder' && target.id) {
       const folder = folders.find(f => f.id === target.id);
-      bulkMoveLinks(idsToMove, null, target.id);
+      bulkMoveLinks(idsToMove, target.id);
       targetLabel = folder ? `Folder "${folder.name}"` : 'Folder';
     }
 
@@ -142,6 +160,19 @@ export default function LibraryPage() {
     setTimeout(() => setToastNotice(null), 3500);
 
     setSelectedLinkIds(prev => prev.filter(id => !idsToMove.includes(id)));
+  };
+
+  // Folder creation handler
+  const handleCreateFolder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim()) return;
+    const created = addFolder(newFolderName.trim(), newFolderParentId);
+    setNewFolderName('');
+    setNewFolderParentId(null);
+    setShowCreateFolderModal(false);
+    setSelectedFolderId(created.id);
+    setIsUnfiledOnly(false);
+    setMobileTab('folders');
   };
 
   return (
@@ -156,22 +187,241 @@ export default function LibraryPage() {
           onSelectAll={() => {
             setSelectedFolderId(null);
             setIsUnfiledOnly(false);
+            setMobileTab('all');
           }}
           onSelectUnfiled={() => {
             setSelectedFolderId(null);
             setIsUnfiledOnly(true);
+            setMobileTab('unfiled');
           }}
           onSelectFolder={id => {
             setSelectedFolderId(id);
             setIsUnfiledOnly(false);
+            setMobileTab('folders');
           }}
           onDropOnTarget={handleDropOnTarget}
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 p-4 sm:p-8 overflow-y-auto space-y-6">
-          {/* Top Control Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200/80 dark:border-zinc-800/80 pb-5">
+        <main className="flex-1 p-4 sm:p-8 pb-28 md:pb-8 overflow-y-auto space-y-4 md:space-y-6">
+          {/* ========================================================= */}
+          {/* MOBILE VIEW CONTROLS (md:hidden - Matches Mobile App UI/UX) */}
+          {/* ========================================================= */}
+          <div className="md:hidden space-y-3">
+            {/* 1. Mobile Header Row (Title & Select Button) */}
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Library
+              </h1>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSelectMode(!isSelectMode);
+                  if (isSelectMode) setSelectedLinkIds([]);
+                }}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                  isSelectMode
+                    ? 'bg-[#093329] border-[#093329] text-white dark:bg-[#BCD94E] dark:border-[#BCD94E] dark:text-[#093329]'
+                    : 'bg-white dark:bg-[#18181b] border-gray-200 dark:border-[#27272a] text-gray-700 dark:text-zinc-300 shadow-xs'
+                }`}
+              >
+                {isSelectMode ? 'Done' : 'Select'}
+              </button>
+            </div>
+
+            {/* 2. Mobile Search Bar */}
+            <div className="relative flex items-center bg-white dark:bg-[#141416] border border-gray-200 dark:border-[#27272a] rounded-2xl px-3 py-2 shadow-xs">
+              <Search size={16} className="text-gray-400 dark:text-zinc-500 mr-2 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Search links, notes, or folders..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="text-xs text-gray-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white ml-2 flex-shrink-0 font-medium"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+
+            {/* 3. Matching Folders Strip (from Search) */}
+            {matchingFolders.length > 0 && (
+              <div className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-[#27272a] rounded-2xl p-2.5 space-y-1.5 shadow-xs">
+                <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                  MATCHING FOLDERS ({matchingFolders.length}):
+                </span>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {matchingFolders.map(mf => (
+                    <button
+                      key={mf.id}
+                      type="button"
+                      onClick={() => {
+                        setMobileTab('folders');
+                        setSelectedFolderId(mf.id);
+                        setIsUnfiledOnly(false);
+                        setSearchQuery('');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-[#27272a] border border-gray-200 dark:border-[#3f3f46] text-gray-800 dark:text-zinc-200 text-xs font-medium whitespace-nowrap"
+                    >
+                      <FolderIcon size={12} className="text-amber-500" />
+                      <span>{mf.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Top Tab Filter Switcher (All links | Unfiled | Folders) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileTab('all');
+                  setSelectedFolderId(null);
+                  setIsUnfiledOnly(false);
+                }}
+                className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${
+                  mobileTab === 'all'
+                    ? 'bg-[#093329] border-[#093329] text-white dark:bg-[#BCD94E] dark:border-[#BCD94E] dark:text-[#093329] font-bold shadow-xs'
+                    : 'bg-white dark:bg-[#18181b] border-gray-200 dark:border-[#27272a] text-gray-600 dark:text-zinc-400'
+                }`}
+              >
+                All links ({links.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileTab('unfiled');
+                  setSelectedFolderId(null);
+                  setIsUnfiledOnly(true);
+                }}
+                className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${
+                  mobileTab === 'unfiled'
+                    ? 'bg-[#093329] border-[#093329] text-white dark:bg-[#BCD94E] dark:border-[#BCD94E] dark:text-[#093329] font-bold shadow-xs'
+                    : 'bg-white dark:bg-[#18181b] border-gray-200 dark:border-[#27272a] text-gray-600 dark:text-zinc-400'
+                }`}
+              >
+                Unfiled ({unfiledCount})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileTab('folders');
+                  setIsUnfiledOnly(false);
+                  if (!selectedFolderId && rootFolders.length > 0) {
+                    setSelectedFolderId(rootFolders[0].id);
+                  }
+                }}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${
+                  mobileTab === 'folders'
+                    ? 'bg-[#093329] border-[#093329] text-white dark:bg-[#BCD94E] dark:border-[#BCD94E] dark:text-[#093329] font-bold shadow-xs'
+                    : 'bg-white dark:bg-[#18181b] border-gray-200 dark:border-[#27272a] text-gray-600 dark:text-zinc-400'
+                }`}
+              >
+                <FolderIcon
+                  size={13}
+                  className={mobileTab === 'folders' ? 'text-white dark:text-[#093329]' : 'text-amber-500'}
+                />
+                <span>Folders ({folders.length})</span>
+              </button>
+            </div>
+
+            {/* 5. Horizontal Folder Chips Bar (when Folders tab is active) */}
+            {mobileTab === 'folders' && (
+              <div className="bg-white dark:bg-[#141416] border border-gray-200 dark:border-[#27272a] rounded-2xl p-2 shadow-xs">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {/* + Folder button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewFolderParentId(selectedFolderId || null);
+                      setShowCreateFolderModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-[#1c1917] border border-gray-300 dark:border-[#3f3f46] text-gray-700 dark:text-zinc-300 text-xs font-semibold whitespace-nowrap hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    <FolderPlus size={13} className="text-gray-500 dark:text-zinc-400" />
+                    <span>+ Folder</span>
+                  </button>
+
+                  {/* Root folder chips */}
+                  {rootFolders.map(rf => {
+                    const isSelected = selectedFolderId === rf.id || currentFolder?.parent_folder_id === rf.id;
+                    const fCount = links.filter(l => l.folder_id === rf.id).length;
+                    return (
+                      <button
+                        key={rf.id}
+                        type="button"
+                        onClick={() => setSelectedFolderId(rf.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all whitespace-nowrap ${
+                          isSelected
+                            ? 'bg-amber-500/15 border-amber-500 text-amber-900 dark:text-amber-300 font-semibold'
+                            : 'bg-gray-50 dark:bg-[#1f1f23] border-gray-200 dark:border-[#2e2e34] text-gray-700 dark:text-zinc-400'
+                        }`}
+                      >
+                        <FolderIcon size={13} className="text-amber-500" />
+                        <span>{rf.name} ({fCount})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 6. Active Folder Navigation (Back button & Subfolders) */}
+            {mobileTab === 'folders' && currentFolder && (parentFolder || subfolders.length > 0) && (
+              <div className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-[#27272a] rounded-2xl p-3 space-y-2 shadow-xs">
+                {parentFolder && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFolderId(parentFolder.id)}
+                    className="inline-flex items-center gap-1.5 text-xs text-[#093329] dark:text-[#BCD94E] font-semibold hover:underline"
+                  >
+                    <ArrowLeft size={13} />
+                    <span>Back to {parentFolder.name}</span>
+                  </button>
+                )}
+
+                {subfolders.length > 0 && (
+                  <div className="space-y-1.5 pt-1 border-t border-gray-100 dark:border-[#27272a]">
+                    <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                      SUBFOLDERS ({subfolders.length})
+                    </span>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                      {subfolders.map(sub => {
+                        const subCount = links.filter(l => l.folder_id === sub.id).length;
+                        return (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => setSelectedFolderId(sub.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-[#27272a] border border-gray-200 dark:border-[#3f3f46] text-gray-800 dark:text-zinc-200 text-xs font-medium whitespace-nowrap"
+                          >
+                            <FolderIcon size={13} className="text-amber-500" />
+                            <span>{sub.name}</span>
+                            <span className="text-[10px] text-gray-500 dark:text-zinc-500">({subCount})</span>
+                            <ChevronRight size={11} className="text-gray-400 dark:text-zinc-500" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ========================================================= */}
+          {/* DESKTOP TOP CONTROL BAR (hidden md:flex) */}
+          {/* ========================================================= */}
+          <div className="hidden md:flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200/80 dark:border-zinc-800/80 pb-5">
             <div>
               {/* Back navigation button if inside a subfolder */}
               {parentFolder && (
@@ -241,9 +491,9 @@ export default function LibraryPage() {
             </div>
           </div>
 
-          {/* Subfolders Navigation Bar (if active folder has child subfolders) */}
+          {/* Desktop Subfolders Navigation Bar */}
           {currentFolder && subfolders.length > 0 && (
-            <div className="p-3 rounded-2xl bg-white dark:bg-zinc-900/40 border border-gray-200/90 dark:border-zinc-800/80 shadow-xs space-y-2">
+            <div className="hidden md:block p-3 rounded-2xl bg-white dark:bg-zinc-900/40 border border-gray-200/90 dark:border-zinc-800/80 shadow-xs space-y-2">
               <span className="text-[11px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
                 <FolderIcon size={13} className="text-amber-500" />
                 <span>Subfolders ({subfolders.length})</span>
@@ -270,9 +520,9 @@ export default function LibraryPage() {
             </div>
           )}
 
-          {/* Matching Folders Search Section */}
+          {/* Desktop Matching Folders Search Section */}
           {matchingFolders.length > 0 && (
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-900/60 border border-gray-200 dark:border-zinc-800 shadow-xs space-y-2">
+            <div className="hidden md:block p-3.5 rounded-2xl bg-white dark:bg-zinc-900/60 border border-gray-200 dark:border-zinc-800 shadow-xs space-y-2">
               <span className="text-[11px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
                 <FolderIcon size={13} className="text-amber-500" />
                 <span>Matching Folders ({matchingFolders.length})</span>
@@ -307,9 +557,8 @@ export default function LibraryPage() {
             </div>
           )}
 
-          {/* Filter Chips Bar (Reading Status) */}
-          <div className="space-y-3">
-            {/* Reading Status Filter */}
+          {/* Desktop Reading Status Filter */}
+          <div className="hidden md:block space-y-3">
             <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
               <span className="text-gray-500 dark:text-zinc-500 text-[11px] font-semibold uppercase tracking-wider mr-1">Status:</span>
               {[
@@ -334,13 +583,13 @@ export default function LibraryPage() {
             </div>
           </div>
 
-          {/* Cards Grid */}
+          {/* Cards Grid / Empty State */}
           {filteredLinks.length === 0 ? (
-            <div className="py-20 text-center flex flex-col items-center justify-center border border-dashed border-gray-300 dark:border-zinc-800 rounded-3xl bg-white/50 dark:bg-zinc-900/20">
-              <Inbox size={40} className="text-gray-400 dark:text-zinc-600 mb-3" />
-              <h3 className="text-base font-semibold text-gray-800 dark:text-zinc-300">No links found</h3>
+            <div className="py-20 text-center flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-zinc-800/80 rounded-3xl bg-white/40 dark:bg-zinc-900/20 px-4">
+              <BookOpen size={48} className="text-gray-300 dark:text-zinc-600 mb-3" />
+              <h3 className="text-base font-bold text-gray-800 dark:text-zinc-200">No items found</h3>
               <p className="text-xs text-gray-500 dark:text-zinc-500 max-w-sm mt-1 mb-4">
-                No items match your active folder, reading status, or search query.
+                Tap the + button below to save a link or note!
               </p>
               <button
                 type="button"
@@ -351,7 +600,7 @@ export default function LibraryPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {filteredLinks.map(link => (
                 <LinkCard
                   key={link.id}
@@ -369,6 +618,20 @@ export default function LibraryPage() {
           )}
         </main>
       </div>
+
+      {/* ========================================================= */}
+      {/* MOBILE FLOATING ACTION BUTTON (+) (md:hidden) */}
+      {/* ========================================================= */}
+      {!isSelectMode && (
+        <button
+          type="button"
+          aria-label="Save link or note"
+          onClick={() => setShowAddModal(true)}
+          className="md:hidden fixed bottom-20 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-[#BCD94E] hover:bg-[#a8c43f] text-[#093329] shadow-xl shadow-[#BCD94E]/25 border border-[#BCD94E]/40 flex items-center justify-center z-40 active:scale-95 transition-transform"
+        >
+          <Plus size={26} strokeWidth={2.5} />
+        </button>
+      )}
 
       {/* Floating Toast Notification */}
       {toastNotice && (
@@ -405,6 +668,79 @@ export default function LibraryPage() {
         link={movingLink}
         onClose={() => setMovingLink(null)}
       />
+
+      {/* Create Folder Modal */}
+      {showCreateFolderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-[#18181b] border border-gray-200 dark:border-[#27272a] rounded-2xl shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#27272a] pb-3">
+              <h3 className="font-semibold text-gray-900 dark:text-zinc-100 text-sm flex items-center gap-2">
+                <FolderIcon size={16} className="text-amber-500" />
+                <span>Create New Folder</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCreateFolderModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateFolder} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-zinc-300 mb-1.5">
+                  Folder Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="e.g. Design, Reading, Work..."
+                  value={newFolderName}
+                  onChange={e => setNewFolderName(e.target.value)}
+                  className="w-full bg-white dark:bg-[#09090b] border border-gray-200 dark:border-[#27272a] rounded-xl px-3.5 py-2.5 text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#093329]/20 dark:focus:ring-[#BCD94E]/30"
+                />
+              </div>
+
+              {folders.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-zinc-300 mb-1.5">
+                    Nest Under Parent Folder (Optional)
+                  </label>
+                  <select
+                    value={newFolderParentId || ''}
+                    onChange={e => setNewFolderParentId(e.target.value || null)}
+                    className="w-full bg-white dark:bg-[#09090b] border border-gray-200 dark:border-[#27272a] rounded-xl px-3.5 py-2 text-xs text-gray-900 dark:text-white focus:outline-none"
+                  >
+                    <option value="">Root Level (No parent)</option>
+                    {folders.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateFolderModal(false)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-medium text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newFolderName.trim()}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#093329] dark:bg-[#BCD94E] text-white dark:text-[#093329] disabled:opacity-50 transition-all"
+                >
+                  Create Folder
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav />

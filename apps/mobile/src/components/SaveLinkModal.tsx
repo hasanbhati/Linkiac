@@ -156,7 +156,6 @@ export function SaveLinkModal({ visible, onClose }: SaveLinkModalProps) {
         title: title.trim() || null,
         comment: comment.trim() || null,
         reading_status: readingStatus,
-        category_id: null,
         folder_id: selectedFolderId,
         thumbnail_url: finalThumb,
       });

@@ -37,7 +37,7 @@ import { getSupabase } from '@/lib/supabase/client';
 import { useTheme } from '@/lib/theme-context';
 
 export default function SettingsPage() {
-  const { currentUser, links, folders, categories, importBookmarks, syncAllFromSupabase, updateProfile } = useApp();
+  const { currentUser, links, folders, importBookmarks, syncAllFromSupabase, updateProfile } = useApp();
   const { theme, setTheme } = useTheme();
 
   // Profile & Username State
@@ -326,7 +326,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/bookmarks/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ links, folders, categories }),
+        body: JSON.stringify({ links, folders }),
       });
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -691,7 +691,7 @@ export default function SettingsPage() {
                     <span>Export Library</span>
                   </div>
                   <p className="text-xs text-gray-600 dark:text-zinc-400">
-                    Download all your saved links, folders, and categories in a clean Netscape Bookmark HTML file.
+                    Download all your saved links and folders in a clean Netscape Bookmark HTML file.
                   </p>
                 </div>
 
@@ -908,7 +908,7 @@ export default function SettingsPage() {
               <span>Danger Zone: Permanent Account Deletion</span>
             </h2>
             <p className="text-xs text-gray-600 dark:text-zinc-400 leading-relaxed max-w-xl">
-              Permanently delete your Linkiac account, including all your saved links, folders, categories, friendships, and outgoing suggestions. Any links already accepted by friends into their own libraries will be preserved as their independent property.
+              Permanently delete your Linkiac account, including all your saved links, folders, friendships, and outgoing suggestions. Any links already accepted by friends into their own libraries will be preserved as their independent property.
             </p>
 
             {deleteError && (

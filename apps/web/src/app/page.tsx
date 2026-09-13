@@ -76,7 +76,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
             {/* Left Column: Headline & Description */}
             <div className="lg:col-span-6 space-y-6 text-left">
-              {/* Category Pill Badge */}
+              {/* Hero Pill Badge */}
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#BCD94E]/25 border border-[#BCD94E]/40 text-[#093329] text-xs font-bold tracking-wide">
                 <Sparkles size={13} className="text-[#093329]" />
                 <span>Universal Link Library & Smart Hub</span>

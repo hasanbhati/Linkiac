@@ -165,7 +165,6 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
           title: title.trim() || null,
           comment: comment.trim() || null,
           reading_status: readingStatus,
-          category_id: null,
           folder_id: folderId,
           thumbnail_url: thumbnailUrl,
         });
@@ -175,7 +174,6 @@ export function SaveLinkModal({ isOpen, onClose, editLink }: SaveLinkModalProps)
           title: title.trim() || null,
           comment: comment.trim() || null,
           reading_status: readingStatus,
-          category_id: null,
           folder_id: folderId,
           thumbnail_url: thumbnailUrl,
         });

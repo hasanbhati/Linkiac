@@ -26,7 +26,6 @@ import {
   X,
   ArrowLeft,
   ChevronRight,
-  Layers,
 } from 'lucide-react-native';
 import { Link, isSafeWebUrl, ensureUrlProtocol, extractDefaultThumbnail } from '@linkiac/shared';
 import { useApp } from '../../src/context/AppContext';
@@ -37,13 +36,12 @@ import { ManageFoldersModal } from '../../src/components/ManageFoldersModal';
 import { SendLinkToFriendsModal } from '../../src/components/SendLinkToFriendsModal';
 
 export default function MobileLibraryScreen() {
-  const { links, folders, categories, syncAllFromSupabase, bulkMoveLinks, bulkDeleteLinks } = useApp();
+  const { links, folders, syncAllFromSupabase, bulkMoveLinks, bulkDeleteLinks } = useApp();
   const { theme, isDark } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [topTab, setTopTab] = useState<'all' | 'unfiled' | 'folders'>('all');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
@@ -62,12 +60,10 @@ export default function MobileLibraryScreen() {
     return links.filter(l => selectedLinkIds.has(l.id));
   }, [links, selectedLinkIds]);
 
-  // Root folders (top level without parent, optionally filtered by category)
+  // Root folders (top level without parent)
   const rootFolders = useMemo(() => {
-    return folders.filter(
-      f => f.parent_folder_id === null && (!selectedCategoryId || f.category_id === selectedCategoryId)
-    );
-  }, [folders, selectedCategoryId]);
+    return folders.filter(f => f.parent_folder_id === null);
+  }, [folders]);
 
   // Active folder details
   const activeFolder = useMemo(() => {
@@ -118,16 +114,9 @@ export default function MobileLibraryScreen() {
         }
       }
 
-      // 3. Category filter
-      if (selectedCategoryId) {
-        const linkMatchesCat = item.category_id === selectedCategoryId;
-        const folderMatchesCat = folders.find(f => f.id === item.folder_id)?.category_id === selectedCategoryId;
-        if (!linkMatchesCat && !folderMatchesCat) return false;
-      }
-
       return true;
     });
-  }, [links, search, topTab, selectedFolderId, selectedCategoryId, folders]);
+  }, [links, search, topTab, selectedFolderId, folders]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -195,7 +184,7 @@ export default function MobileLibraryScreen() {
     if (selectedLinkIds.size === 0) return;
     setIsBulkMoving(true);
     try {
-      await bulkMoveLinks(Array.from(selectedLinkIds), null, moveTargetFolderId);
+      await bulkMoveLinks(Array.from(selectedLinkIds), moveTargetFolderId);
       setSelectedLinkIds(new Set());
       setIsSelectionMode(false);
       setIsMoveModalOpen(false);
@@ -360,78 +349,6 @@ export default function MobileLibraryScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-
-      {/* Horizontal Category Filter Bar (GAP-01) */}
-      {categories.length > 0 && (
-        <View style={styles.categoryBarContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryBarScroll}
-          >
-            <TouchableOpacity
-              style={[
-                styles.categoryBarChip,
-                {
-                  backgroundColor: selectedCategoryId === null ? theme.accentPrimaryMuted : theme.surfaceSubtle,
-                  borderColor: selectedCategoryId === null ? theme.accentPrimary : theme.border,
-                },
-              ]}
-              onPress={() => setSelectedCategoryId(null)}
-              activeOpacity={0.8}
-            >
-              <Text
-                style={[
-                  styles.categoryBarChipText,
-                  {
-                    color: selectedCategoryId === null ? theme.accentPrimary : theme.textSecondary,
-                    fontWeight: selectedCategoryId === null ? '700' : '500',
-                  },
-                ]}
-              >
-                All Categories
-              </Text>
-            </TouchableOpacity>
-            {categories.map(cat => {
-              const isSelected = selectedCategoryId === cat.id;
-              const catLinksCount = links.filter(
-                l => l.category_id === cat.id || folders.find(f => f.id === l.folder_id)?.category_id === cat.id
-              ).length;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[
-                    styles.categoryBarChip,
-                    {
-                      backgroundColor: isSelected ? theme.accentPrimaryMuted : theme.surfaceSubtle,
-                      borderColor: isSelected ? theme.accentPrimary : theme.border,
-                    },
-                  ]}
-                  onPress={() => setSelectedCategoryId(isSelected ? null : cat.id)}
-                  activeOpacity={0.8}
-                >
-                  <Layers
-                    color={isSelected ? theme.accentPrimary : theme.textMuted}
-                    size={11}
-                    style={{ marginRight: 5 }}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryBarChipText,
-                      {
-                        color: isSelected ? theme.accentPrimary : theme.textSecondary,
-                        fontWeight: isSelected ? '700' : '500',
-                      },
-                    ]}
-                  >
-                    {cat.name} ({catLinksCount})
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
 
       {/* Horizontal Draggable Folder Bar (Shown when Folders tab is active, Item 1) */}
       {topTab === 'folders' && (
@@ -970,37 +887,6 @@ const styles = StyleSheet.create({
   topTabBtnTextActive: {
     color: '#BCD94E',
     fontWeight: '600',
-  },
-  categoryBarContainer: {
-    marginBottom: 10,
-  },
-  categoryBarScroll: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingVertical: 2,
-  },
-  categoryBarChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    backgroundColor: '#141416',
-    borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  categoryBarChipActive: {
-    backgroundColor: 'rgba(188, 217, 78, 0.15)',
-    borderColor: '#BCD94E',
-  },
-  categoryBarChipText: {
-    color: '#a1a1aa',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  categoryBarChipTextActive: {
-    color: '#BCD94E',
-    fontWeight: '700',
   },
   horizontalFolderContainer: {
     marginBottom: 10,

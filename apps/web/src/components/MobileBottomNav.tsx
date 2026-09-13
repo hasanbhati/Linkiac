@@ -18,7 +18,7 @@ export function MobileBottomNav() {
     { name: 'Library', href: '/library', icon: <Bookmark size={18} />, active: pathname.startsWith('/library') },
     { name: 'Inbox', href: '/inbox', icon: <Inbox size={18} />, badge: pendingCount, active: pathname === '/inbox' },
     { name: 'Friends', href: '/friends', icon: <Users size={18} />, active: pathname === '/friends' },
-    { name: 'Stats', href: '/dashboard', icon: <BarChart3 size={18} />, active: pathname === '/dashboard' },
+    { name: 'Dashboard', href: '/dashboard', icon: <BarChart3 size={18} />, active: pathname === '/dashboard' },
     { name: 'Settings', href: '/settings', icon: <Settings size={18} />, active: pathname.startsWith('/settings') },
   ];
 

@@ -29,7 +29,6 @@ export function MoveLinkModal({ isOpen, onClose, link }: MoveLinkModalProps) {
     e.preventDefault();
     updateLink(link.id, {
       folder_id: folderId,
-      category_id: null,
     });
     onClose();
   };

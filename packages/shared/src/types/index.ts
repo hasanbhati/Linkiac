@@ -15,20 +15,9 @@ export interface Profile {
   created_at: string;
 }
 
-export interface Category {
-  id: string;
-  user_id: string;
-  name: string;
-  created_at: string;
-  updated_at?: string;
-  folders_count?: number;
-  links_count?: number;
-}
-
 export interface Folder {
   id: string;
   user_id: string;
-  category_id: string | null;
   parent_folder_id: string | null;
   name: string;
   created_at: string;
@@ -48,7 +37,6 @@ export interface Link {
   reading_status: ReadingStatus;
   thumbnail_url: string | null;
   thumbnail_source: ThumbnailSource;
-  category_id: string | null;
   folder_id: string | null;
   created_at: string;
   updated_at: string;
@@ -126,7 +114,6 @@ export interface DomainStat {
 }
 
 export interface LibraryFilter {
-  categoryId?: string | null;
   folderId?: string | null;
   unfiledOnly?: boolean;
   readingStatus?: ReadingStatus | 'all';

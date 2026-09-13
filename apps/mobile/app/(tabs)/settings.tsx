@@ -42,7 +42,7 @@ import { useTheme } from '../../src/context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 
 export default function MobileSettingsScreen() {
-  const { currentUser, links, categories, folders, signOut, updateProfile, importBookmarks } = useApp();
+  const { currentUser, links, folders, signOut, updateProfile, importBookmarks } = useApp();
   const { theme, themeMode, setThemeMode } = useTheme();
 
   // User email
@@ -379,7 +379,7 @@ export default function MobileSettingsScreen() {
 
     setIsExporting(true);
     try {
-      const htmlContent = generateNetscapeBookmarks({ links, folders, categories });
+      const htmlContent = generateNetscapeBookmarks({ links, folders });
       const fileName = `linkiac_bookmarks_${new Date().toISOString().slice(0, 10)}.html`;
       const rawBaseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
       const baseDir = rawBaseDir.endsWith('/') ? rawBaseDir : `${rawBaseDir}/`;

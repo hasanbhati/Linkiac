@@ -11,7 +11,7 @@ interface BulkActionBarProps {
 }
 
 export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarProps) {
-  const { categories, folders, bulkMoveLinks, bulkDeleteLinks } = useApp();
+  const { folders, bulkMoveLinks, bulkDeleteLinks } = useApp();
 
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -19,12 +19,7 @@ export function BulkActionBar({ selectedIds, onClearSelection }: BulkActionBarPr
   if (selectedIds.length === 0) return null;
 
   const handleBulkMove = () => {
-    let resolvedCategoryId: string | null = null;
-    if (selectedFolderId) {
-      const f = folders.find(folder => folder.id === selectedFolderId);
-      if (f) resolvedCategoryId = f.category_id;
-    }
-    bulkMoveLinks(selectedIds, resolvedCategoryId, selectedFolderId);
+    bulkMoveLinks(selectedIds, selectedFolderId);
     setShowMoveDialog(false);
     onClearSelection();
   };

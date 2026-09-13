@@ -137,7 +137,7 @@ export default function PrivacyPolicyPage() {
               </div>
               <p className="text-xs sm:text-sm text-red-800">
                 Navigating to <strong>Settings &gt; Delete Account</strong> permanently removes your user profile, all saved
-                bookmarks, nested folders, categories, friend connections, and inbox suggestions via a secure PostgreSQL
+                bookmarks, nested folders, friend connections, and inbox suggestions via a secure PostgreSQL
                 transaction. This action is irreversible.
               </p>
             </div>

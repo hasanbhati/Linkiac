@@ -54,7 +54,7 @@ export function FolderTree({
   const handleCreateRootFolder = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRootFolderName.trim()) return;
-    addFolder(newRootFolderName.trim(), null, null);
+    addFolder(newRootFolderName.trim());
     setNewRootFolderName('');
     setShowAddRootFolder(false);
   };
@@ -63,7 +63,7 @@ export function FolderTree({
     e.stopPropagation();
     const name = prompt('Subfolder name:');
     if (name && name.trim()) {
-      addFolder(name.trim(), null, parentFolderId);
+      addFolder(name.trim(), parentFolderId);
       setExpandedFolders(prev => new Set([...prev, parentFolderId]));
     }
   };

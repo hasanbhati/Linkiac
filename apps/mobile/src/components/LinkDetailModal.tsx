@@ -209,7 +209,7 @@ export function LinkDetailModal({ visible, link, onClose, onShareToFriends }: Li
 
             {/* Folder */}
             {folders.length > 0 && (
-              <View style={styles.categorizeSection}>
+              <View style={styles.folderSection}>
                 <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>Folder</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
                   <TouchableOpacity
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  categorizeSection: {
+  folderSection: {
     marginBottom: 14,
   },
   chipsRow: {

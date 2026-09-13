@@ -70,7 +70,7 @@ export default function TermsOfServicePage() {
             </h2>
             <p>
               Linkiac is a privacy-first universal link curator, bookmark manager, and private recommendation platform.
-              Our core features include saving, tagging, organizing, and categorizing web hyperlinks, viewing reading status
+              Our core features include saving, tagging, organizing, and filing web hyperlinks into folders, viewing reading status
               analytics, importing/exporting browser bookmark archives, and privately recommending links to accepted mutual
               friends.
             </p>

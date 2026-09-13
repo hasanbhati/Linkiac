@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseNetscapeBookmarks } from './parser';
 import { generateNetscapeBookmarks } from './generator';
-import { Link, Folder, Category } from '../types';
+import { Link, Folder } from '../types';
 
 describe('Netscape Bookmark Parser', () => {
   it('parses typical browser export with folders and items', () => {
@@ -55,12 +55,9 @@ describe('Netscape Bookmark Parser', () => {
 
 describe('Netscape Bookmark Generator', () => {
   it('generates standard HTML matching the Netscape Bookmark specification', () => {
-    const categories: Category[] = [
-      { id: 'cat-1', user_id: 'u1', name: 'Work', created_at: new Date().toISOString() },
-    ];
     const folders: Folder[] = [
-      { id: 'fol-1', user_id: 'u1', category_id: null, parent_folder_id: null, name: 'Design', created_at: new Date().toISOString() },
-      { id: 'fol-2', user_id: 'u1', category_id: null, parent_folder_id: 'fol-1', name: 'Inspiration', created_at: new Date().toISOString() },
+      { id: 'fol-1', user_id: 'u1', parent_folder_id: null, name: 'Design', created_at: new Date().toISOString() },
+      { id: 'fol-2', user_id: 'u1', parent_folder_id: 'fol-1', name: 'Inspiration', created_at: new Date().toISOString() },
     ];
     const links: Link[] = [
       {
@@ -73,7 +70,6 @@ describe('Netscape Bookmark Generator', () => {
         reading_status: 'to_read',
         thumbnail_url: null,
         thumbnail_source: 'none',
-        category_id: null,
         folder_id: 'fol-2',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -88,14 +84,13 @@ describe('Netscape Bookmark Generator', () => {
         reading_status: 'done',
         thumbnail_url: null,
         thumbnail_source: 'none',
-        category_id: null,
         folder_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
     ];
 
-    const html = generateNetscapeBookmarks({ categories, folders, links });
+    const html = generateNetscapeBookmarks({ folders, links });
     expect(html).toContain('<!DOCTYPE NETSCAPE-Bookmark-file-1>');
     expect(html).toContain('<H3 ADD_DATE=');
     expect(html).toContain('Design');

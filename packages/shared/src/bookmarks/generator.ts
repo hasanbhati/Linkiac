@@ -1,10 +1,9 @@
-import { Link, Folder, Category } from '../types';
+import { Link, Folder } from '../types';
 import { isSafeWebUrl, ensureUrlProtocol } from '../utils/url';
 
 export interface ExportData {
   links: Link[];
   folders: Folder[];
-  categories: Category[];
 }
 
 function escapeHtml(text: string): string {
@@ -18,11 +17,11 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Generates a standard Netscape Bookmark File (.html) from user's links, folders, and categories.
+ * Generates a standard Netscape Bookmark File (.html) from user's links and folders.
  * Supported by Chrome, Firefox, Safari, and Edge.
  */
 export function generateNetscapeBookmarks(data: ExportData): string {
-  const { links, folders, categories } = data;
+  const { links, folders } = data;
 
   const nowUnix = Math.floor(Date.now() / 1000);
 
@@ -91,38 +90,11 @@ export function generateNetscapeBookmarks(data: ExportData): string {
     return out;
   }
 
-  // Render Category-grouped links (for links that have category_id but no folder_id)
-  const categoryMap = new Map<string, Category>();
-  categories.forEach(c => categoryMap.set(c.id, c));
-
-  const unfiledWithCategory = links.filter(l => l.category_id && !l.folder_id);
-  const linksByCategory = new Map<string, Link[]>();
-  unfiledWithCategory.forEach(l => {
-    const catId = l.category_id!;
-    if (!linksByCategory.has(catId)) linksByCategory.set(catId, []);
-    linksByCategory.get(catId)!.push(l);
-  });
-
-  for (const [catId, catLinks] of linksByCategory.entries()) {
-    const cat = categoryMap.get(catId);
-    const catName = escapeHtml(cat ? cat.name : 'Category');
-    html += `  <DT><H3 ADD_DATE="${nowUnix}">${catName}</H3>\n`;
-    html += `  <DL><p>\n`;
-    for (const link of catLinks) {
-      const title = escapeHtml(link.title || link.url);
-      const safeUrl = isSafeWebUrl(link.url) ? ensureUrlProtocol(link.url) : '#';
-      const url = escapeHtml(safeUrl);
-      const addDate = Math.floor(new Date(link.created_at).getTime() / 1000) || nowUnix;
-      html += `    <DT><A HREF="${url}" ADD_DATE="${addDate}">${title}</A>\n`;
-    }
-    html += `  </DL><p>\n`;
-  }
-
   // Render root-level folders (parent_folder_id === null)
   html += renderFolderTree(null, 1);
 
-  // Render standalone unfiled links (no folder, no category)
-  const unfiledStandalone = links.filter(l => !l.folder_id && !l.category_id);
+  // Render standalone unfiled links (no folder)
+  const unfiledStandalone = links.filter(l => !l.folder_id);
   if (unfiledStandalone.length > 0) {
     html += `  <DT><H3 ADD_DATE="${nowUnix}">Unfiled</H3>\n`;
     html += `  <DL><p>\n`;

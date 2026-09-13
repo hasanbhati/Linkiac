@@ -177,7 +177,6 @@ export default function MobileInboxScreen() {
     setIsAccepting(true);
     try {
       const link = await acceptSuggestion(acceptingItem.id, {
-        category_id: null,
         folder_id: targetFolderId,
         title: titleInput.trim() || null,
         comment: commentInput.trim() || null,

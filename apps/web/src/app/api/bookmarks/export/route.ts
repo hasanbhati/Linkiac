@@ -4,9 +4,9 @@ import { generateNetscapeBookmarks } from '@linkiac/shared';
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
-    const { links = [], folders = [], categories = [] } = data;
+    const { links = [], folders = [] } = data;
 
-    const htmlContent = generateNetscapeBookmarks({ links, folders, categories });
+    const htmlContent = generateNetscapeBookmarks({ links, folders });
 
     return new NextResponse(htmlContent, {
       headers: {
